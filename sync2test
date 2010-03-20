@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 22/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.20
+# 23/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 0.21
 
 principal() {
 	# Definicao de variaveis do programa
@@ -157,7 +157,7 @@ principal() {
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 			# Selecao de modulo
-			MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste:\" 0 0 0 $MODULOS_PROJETO)
+			MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste na pasta [$PROJETO]:\" 0 0 0 $MODULOS_PROJETO)
 
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
@@ -167,7 +167,7 @@ principal() {
 				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
 
 				if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}" 
+					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas comuns a todos os modulos do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}" 
 				fi
 
 				while : ; do
@@ -304,6 +304,11 @@ sincroniza() {
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
 		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+
+		# Adiciona os arquivos na lista de arquivos para nao sincronizar
+		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE
+
+		# Adiciona os campos para preparar para a caixa de checkbox do dialog
 		sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
 		rm "${LISTA_TMP}1" 
 
@@ -313,17 +318,27 @@ sincroniza() {
 		[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
 
 		if [ -n "$ARQ_EXCLUDES" ]; then
-			NAO_SINC=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Selecione os arquivos que nao serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+			LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+
 			# Se nao cancelou
 			if [ $? -eq 0 ]; then
-				# Adiciona na lista os arquivos que nao serao sincronizados
-				echo "$NAO_SINC" | while read LINHA
-				do
-					echo "$LINHA" >> $LISTA_EXCLUDE
-				done
+				# Se selecionou arquivos
+				if [ -n "$LISTA_SINCRONIZAR" ]; then
+					# Adiciona na lista os arquivos que nao serao sincronizados
+					echo "$LISTA_SINCRONIZAR" | while read LINHA
+					do
+						# Adiciona escape nas barras separadoras dos diretorios
+						LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
 
-				# Sincroniza o projeto sem os arquivos selecionados anteriormente
-				rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+						# Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
+						sed "/$LINHA_TEMP/d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
+
+						mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
+					done
+
+					# Sincroniza o projeto sem os arquivos selecionados anteriormente
+					rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+				fi
 			fi
 		else
 			# Sincroniza o projeto prevendo delecao de arquivos

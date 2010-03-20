@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 28/09/2009 - Luiz Sanches
-# Versao 0.12
+# 29/09/2009 - Luiz Sanches
+# Versao 0.13
 
 principal() {
 	# Definicao de variaveis do programa
@@ -22,6 +22,7 @@ principal() {
 	ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log" 
 	ARQUIVO_LOG_PERMANENTE="$DIR_CONF_USER/$SCRIPT.log"
 
+	##PERMISSOES="Do+w,Fugo+rw,Fugo-x"
 	PERMISSOES="Fugo+rw,Fugo-x"
 
 	# Criacao dos diretorios de configuracao do programa
@@ -197,7 +198,7 @@ principal() {
 
 				while read LINHA
 				do
-					sincronizaDiretorio "$LINHA"
+					sincronizaDiretorio $LINHA
 				done < $ARQUIVO_PROJETO_DEMAIS
 
 				exibeResultado
@@ -205,9 +206,20 @@ principal() {
 			else
 				DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
 
-				PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/;s/:/ $DIR_DESTINO_ESCAPE/")
+				DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
 
-				sincroniza "$PROJETO_COMPLETO" ra
+				# formata os caminhos de origem e destino, exemplo:
+				# antes.: siig:siig_homologacao
+				# depois: /var/www/siig/ /var/www/siig_homologacao/
+				PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+
+				DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+
+				DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+
+				sincroniza $PROJETO_COMPLETO r
+
+				exibeResultado
 			fi
 		fi
 	else # Para a escolha de um modulo
@@ -264,13 +276,20 @@ sincroniza() {
 	#echo $3 = r (recursive), a (archive), d (directory)
 	#echo $4 = qualquer parametro do rsync
 
+	# Cria o diretorio de backup com permissoes para outros usuarios gravarem nele
+	NIVEL1_DIR_BACKUP=$(echo $DIR_BACKUP | cut -d"/" -f4)
+	NIVEL1_DIR_BACKUP="${DIR_DESTINO}${NIVEL1_DIR_BACKUP}"
+
+	[ ! -e "$NIVEL1_DIR_BACKUP" ] && mkdir -p "$NIVEL1_DIR_BACKUP"
+	chmod 777 -R $NIVEL1_DIR_BACKUP 2> /dev/null
+
 	# Sincroniza o projeto criando um backup
-	#rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG $1 $2
+	##rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG $1 $2
 	rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
 		
 	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
 	cp $ARQUIVO_LOG $ARQUIVO_LOG.old
-	sed "/building/ d;/done/ d;/sent/,+1 d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
+	sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
 	rm $ARQUIVO_LOG.old
 
 	# Atualiza o arquivo de log permanente
@@ -305,4 +324,4 @@ verificaArquivo() {
 	fi
 }
 
-principal $1
+principal

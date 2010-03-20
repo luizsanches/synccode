@@ -1,83 +1,136 @@
 #!/bin/bash
 # Script de sincronizacao de codigo-fonte com o servidor de teste
-# 08/09/2009 - Luiz Sanches
-# Versao 0.4
+# 09/09/2009 - Luiz Sanches
+# Versao 0.5
 
-projeto="siig"
+principal() {
+	diretorio_script=$(pwd)
 
-# Verifica a existencia do programa dialog
-if [ ! -e "/usr/bin/dialog" ]; then
-	echo "ATENCAO! E necessario instalar o programa 'dialog'."
-	exit
-fi
+	projeto="siig"
 
-# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
-if [ -e "/home/$USER/.sync2test" ]; then
-	. /home/$USER/.sync2test
-else
-	usuario=$( dialog --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
-	servidor=$( dialog --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
-	senha_svn=$( dialog --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
-	dir_destino=$( dialog --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
-	porta_ssh=$( dialog --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
+	# Verifica a existencia do programa dialog
+	if [ ! -e "/usr/bin/dialog" ]; then
+		echo "ATENCAO! E necessario instalar o programa 'dialog'."
+		exit
+	fi
 
-	echo "usuario=\"$usuario\"" > /home/$USER/.sync2test
-	echo "servidor=\"$servidor\"" >> /home/$USER/.sync2test
-	echo "senha_svn=\"$senha_svn\"" >> /home/$USER/.sync2test
-	echo "dir_destino=\"$dir_destino\"" >> /home/$USER/.sync2test
-	echo "porta_ssh=\"$porta_ssh\"" >> /home/$USER/.sync2test
-fi
+	# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
+	if [ -e "/home/$USER/.sync2test" ]; then
+		. /home/$USER/.sync2test
+	else
+		usuario=$( dialog --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
+		servidor=$( dialog --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
+		senha_svn=$( dialog --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
+		dir_destino=$( dialog --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
+		porta_ssh=$( dialog --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
 
-caminho_destino=$servidor:$dir_destino
+		echo "usuario=\"$usuario\"" > /home/$USER/.sync2test
+		echo "servidor=\"$servidor\"" >> /home/$USER/.sync2test
+		echo "senha_svn=\"$senha_svn\"" >> /home/$USER/.sync2test
+		echo "dir_destino=\"$dir_destino\"" >> /home/$USER/.sync2test
+		echo "porta_ssh=\"$porta_ssh\"" >> /home/$USER/.sync2test
+	fi
 
-# Criar autorizacao para nao pedir senha ao conectar via ssh
-if [ ! -e "/home/$USER/.ssh/authorized_keys" ]; then
-	ssh -p $porta_ssh $usuario@$servidor 'mkdir ~/.ssh ; touch ~/.ssh/authorized_keys'
-	ssh-keygen -t dsa -f ~/.ssh/id_dsa
-	cat ~/.ssh/id_dsa.pub | ssh -p $porta_ssh $usuario@$servidor 'cat - >> ~/.ssh/authorized_keys'
-	cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
-fi
+	caminho_destino=$servidor:$dir_destino
 
-arquivo_log="/home/$USER/.sync2test-temp.log" 
-arquivo_log_permanente="/home/$USER/.sync2test.log"
-#permissoes="Du+wrx,Dgo+rx,Fugo+r,Fu+w,Fgo-w,Fugo-x"
-permissoes="Fugo+r,Fu+w,Fgo-w,Fugo-x"
+	# Criar autorizacao para nao pedir senha ao conectar via ssh
+	if [ ! -e "/home/$USER/.ssh/authorized_keys" ]; then
+		ssh -p $porta_ssh $usuario@$servidor 'mkdir ~/.ssh ; touch ~/.ssh/authorized_keys'
+		ssh-keygen -t dsa -f ~/.ssh/id_dsa
+		cat ~/.ssh/id_dsa.pub | ssh -p $porta_ssh $usuario@$servidor 'cat - >> ~/.ssh/authorized_keys'
+		cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+	fi
 
-# deleta o arquivo de log para mostrar somente a ultima sincronizacao
-rm $arquivo_log 2> /dev/null
-
-# Selecao de modulo
-modulo=$( dialog \
-	--stdout \
-	--menu "Selecione o modulo do $projeto a ser atualizado para o servidor de teste:" \
-	0 0 0 \
-	Sco 'Controle de Obras' \
-	Afr 'Administracao de Frota' )
-
-# se o modulo for nulo, emitir mensagem e sair
-if [ -z $modulo ]
-then
-	dialog                                             \
-		--title 'sync2test'                            \
-		--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
-	6 40
-	exit
-else
-	# Adiciona um nivel de diretorio na variavel modulo
-	arvore="/view/"
-	facade=$modulo
-
-	# Converte o conteudo da variavel modulo para minusculo
-	modulo=$(echo $modulo | tr [:upper:] [:lower:])
+	arquivo_log="/home/$USER/.sync2test-temp.log" 
+	arquivo_log_permanente="/home/$USER/.sync2test.log"
+	#permissoes="Du+wrx,Dgo+rx,Fugo+r,Fu+w,Fgo-w,Fugo-x"
+	permissoes="Fugo+r,Fu+w,Fgo-w,Fugo-x"
 
 	# prepara o diretorio de sincronizacao
 	dir_tmp_sync="/tmp/sync2test/$projeto"
 
-	dir_backup=$dir_destino"bkp-$projeto-$modulo/`date +%Y-%m-%d-%H-%M`"
+	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
+	rm $arquivo_log 2> /dev/null
 
-	# Une view/nome do modulo
-	modulo=$arvore$modulo
+	# Se o primeiro parametro for -all (todos), deve perguntar se deseja sincronizar os demais diretorios do projeto
+	if [ $1 = "-all" ]; then
+		dialog --yesno "Deseja sincronizar as demais pastas do projeto $projeto?" 0 0
 
+		if [ $? = 0 ]; then
+			dir_backup=$dir_destino"bkp-$projeto/geral/`date +%Y-%m-%d-%H-%M`"
+
+			# Executa a funcao para baixar o projeto do SVN
+			baixaProjetoSvn
+	
+			sincroniza $dir_tmp_sync/config/ $caminho_destino$projeto/config/ d
+			sincroniza $dir_tmp_sync/controller/ $caminho_destino$projeto/controller/ d
+			sincroniza $dir_tmp_sync/model/ $caminho_destino$projeto/model/ d
+			sincroniza $dir_tmp_sync/model/database/ $caminho_destino$projeto/model/database/ d
+			sincroniza $dir_tmp_sync/model/generic/ $caminho_destino$projeto/model/generic/ d
+			sincroniza $dir_tmp_sync/model/template/ $caminho_destino$projeto/model/template/ dr
+			sincroniza $dir_tmp_sync/model/utils/ $caminho_destino$projeto/model/utils/ dr
+			sincroniza $dir_tmp_sync/view/ $caminho_destino$projeto/view/ d
+			sincroniza $dir_tmp_sync/view/css/ $caminho_destino$projeto/view/css/ dr
+			sincroniza $dir_tmp_sync/view/images/ $caminho_destino$projeto/view/images/ dr
+			sincroniza $dir_tmp_sync/view/js/ $caminho_destino$projeto/view/js/ dr
+			sincroniza $dir_tmp_sync/view/style/ $caminho_destino$projeto/view/style/ dr
+
+			exibeResultado
+		fi
+		exit
+	fi
+
+	# Selecao de modulo
+	modulo=$( dialog \
+		--stdout \
+		--menu "Selecione o modulo do $projeto a ser atualizado para o servidor de teste:" \
+		0 0 0 \
+		Sco 'Controle de Obras' \
+		Afr 'Administracao de Frota' )
+
+	# se o modulo for nulo, emitir mensagem e sair
+	if [ -z $modulo ]; then
+		dialog                                             \
+			--title 'sync2test'                            \
+			--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
+		6 40
+		exit
+	else
+		# Adiciona um nivel de diretorio na variavel modulo
+		arvore="/view/"
+		facade=$modulo
+
+		# Converte o conteudo da variavel modulo para minusculo
+		modulo=$(echo $modulo | tr [:upper:] [:lower:])
+
+		dir_backup=$dir_destino"bkp-$projeto/$modulo/`date +%Y-%m-%d-%H-%M`"
+
+		# Une view/nome do modulo
+		modulo=$arvore$modulo
+
+		# Executa a funcao para baixar o projeto do SVN
+		baixaProjetoSvn
+
+		# Sincroniza o projeto criando um backup
+		dir_existe=$(ssh -p $porta_ssh $usuario@$servidor "ls $dir_destino$projeto/index.php")
+
+		if [ -z $dir_existe ]; then
+			sincroniza $dir_tmp_sync $caminho_destino ra
+		else
+			sincroniza $dir_tmp_sync$modulo $caminho_destino$projeto$arvore ra
+		fi
+
+		# Sincroniza as fachadas do modulo
+		#cd $dir_tmp_sync/model/facade/
+		#sincroniza "$facade*.php" $caminho_destino$projeto/model/facade/ r
+		#cd -
+		sincroniza $dir_tmp_sync/model/facade/ $caminho_destino$projeto/model/facade/ r --include="+ $dir_tmp_sync/model/facade/$facade*.php" 
+
+		exibeResultado
+	fi
+}
+
+baixaProjetoSvn() {
 	# Se o diretorio existir executar SVN update
 	if [ -e $dir_tmp_sync ]; then
 		svn update $dir_tmp_sync
@@ -85,27 +138,41 @@ else
 		mkdir -p $dir_tmp_sync 2> /dev/null
 		svn checkout svn://$servidor/var/svn/desenvolvimento/$projeto --username $usuario --password $senha_svn $dir_tmp_sync
 	fi
+}
+
+sincroniza() {
+	#echo $1 = origem
+	#echo $2 = destino
+	#echo $3 = r (recursive), a (archive), d (directory)
+	#echo $4 = qualquer parametro do rsync
 
 	# Sincroniza o projeto criando um backup
-	dir_existe=$(ssh -p $porta_ssh $usuario@$servidor "ls $dir_destino$projeto/index.php")
-
-	if [ -z $dir_existe ]; then
-		rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $dir_tmp_sync $caminho_destino
-	else
-		rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $dir_tmp_sync$modulo $caminho_destino$projeto$arvore
-	fi
-
-	# Sincroniza as fachadas do modulo
-	cd $dir_tmp_sync/model/facade
-	rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $facade*.php $caminho_destino$projeto/model/facade/
-	cd -
+	rsync -Cvzp$3 $4 --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $1 $2
+		
+	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
+	cp $arquivo_log $arquivo_log.old
+	sed '/building/,+1d;/sent/,+1d' $arquivo_log.old > $arquivo_log
+	rm $arquivo_log.old
 
 	# Atualiza o arquivo de log permanente
 	cat $arquivo_log >> $arquivo_log_permanente
+}
 
-	dialog                                             \
-		--title 'sync2test - log da atualizacao'       \
-		--textbox $arquivo_log   \
-	0 0
-	clear
-fi
+exibeResultado() {
+	conteudo=$(cat $arquivo_log)
+
+	if [ -z "$conteudo" ]; then
+		dialog                                             \
+			--title 'sync2test - log da atualizacao'       \
+			--msgbox 'Nenhum arquivo foi atualizado'   \
+		0 0
+	else
+		dialog                                             \
+			--title 'sync2test - log da atualizacao'       \
+			--textbox $arquivo_log   \
+		0 0
+	fi
+		clear
+}
+
+principal $1

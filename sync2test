@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 10/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.18
+# 22/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 0.19
 
 principal() {
 	# Definicao de variaveis do programa
@@ -153,8 +153,8 @@ principal() {
 		fi
 
 		while : ; do
-			# deleta o arquivo de log para mostrar somente a ultima sincronizacao
-			[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+			# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
+			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 			# Selecao de modulo
 			MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste:\" 0 0 0 $MODULOS_PROJETO)
@@ -171,8 +171,8 @@ principal() {
 				fi
 
 				while : ; do
-					# deleta o arquivo de log para mostrar somente a ultima sincronizacao
-					[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+					# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
+					[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 					# Selecao de outras opcoes
 					OPCAO=$(eval $DIALOG --stdout --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
@@ -295,6 +295,9 @@ sincroniza() {
 	LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
 	LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
 
+	# deleta o arquivo de log
+	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+
 	# Cria a lista de arquivos que nao seram sincronizados
 	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
 
@@ -339,12 +342,10 @@ sincroniza() {
 
 	if [ -e "$ARQUIVO_LOG" ]; then
 		# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
-		cp $ARQUIVO_LOG "$ARQUIVO_LOG.old"
-		sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "$ARQUIVO_LOG.old" > $ARQUIVO_LOG
-		rm "$ARQUIVO_LOG.old"
-
-		# Atualiza o arquivo de log permanente
-		cat $ARQUIVO_LOG >> $ARQUIVO_LOG_PERMANENTE
+		mv "$ARQUIVO_LOG" "${ARQUIVO_LOG}.old"
+		sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "${ARQUIVO_LOG}.old" > "$ARQUIVO_LOG"
+		rm "${ARQUIVO_LOG}.old"
+		cat "$ARQUIVO_LOG" >> "${ARQUIVO_LOG}.res"
 	fi
 }
 
@@ -358,12 +359,15 @@ sincronizaDiretorio() {
 }
 
 exibeResultado() {
-	CONTEUDO=$(cat $ARQUIVO_LOG)
+	CONTEUDO=$(cat "${ARQUIVO_LOG}.res")
 
 	if [ -z "$CONTEUDO" ]; then
 		eval $DIALOG --title \"log da atualizacao\" --msgbox \"Nenhum arquivo foi atualizado\" 0 0
 	else
-		eval $DIALOG --title \"log da atualizacao\" --textbox $ARQUIVO_LOG 0 0
+		# Atualiza o arquivo de log permanente
+		cat "${ARQUIVO_LOG}.res" >> $ARQUIVO_LOG_PERMANENTE
+
+		eval $DIALOG --title \"log da atualizacao\" --textbox "${ARQUIVO_LOG}.res" 0 0
 	fi
 }
 

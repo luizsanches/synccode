@@ -1,24 +1,30 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 17/09/2009 - Luiz Sanches
-# Colaboradores: Robison Viegas, Vitor Makino
-# Versao 0.10
-# Funcionalidades da Versao: atualizacao para trabalhar com cygwin
+# 22/09/2009 - Luiz Sanches
+# Versao 0.11
 
 principal() {
 	# Definicao de variaveis do programa
 	SCRIPT="sync2test"
 	DIR_SCRIPT=$(pwd)
-	DIR_CONF="$HOME/.$SCRIPT"
+
+	DIR_CONF="/opt/$SCRIPT"
+	DIR_CONF_USER="$HOME/.$SCRIPT"
+
 	ARQUIVO_CONF="$DIR_CONF/$SCRIPT.conf"
+	ARQUIVO_CONF_USER="$DIR_CONF_USER/$SCRIPT.conf"
+
 	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
-	ARQUIVO_LOG="$DIR_CONF/.$SCRIPT-temp.log" 
-	ARQUIVO_LOG_PERMANENTE="$DIR_CONF/$SCRIPT.log"
+
+	ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log" 
+	ARQUIVO_LOG_PERMANENTE="$DIR_CONF_USER/$SCRIPT.log"
+
 	PERMISSOES="Fugo+rw,Fugo-x"
 
-	# Criacao do diretorio de configuracao do programa
+	# Criacao dos diretorios de configuracao do programa
 	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
+	[ ! -e "$DIR_CONF_USER" ] && mkdir "$DIR_CONF_USER"
 
 	# Definicao do program de dialogo como o usuario
 	if [ "$DISPLAY" ]; then
@@ -34,10 +40,9 @@ principal() {
 	verificaArquivo "/usr/bin/$DIALOG"
 	verificaArquivo "/usr/bin/svn"
 	verificaArquivo "/usr/bin/rsync"
-	verificaArquivo "/usr/bin/ssh"
 	verificaArquivo "/bin/sed"
 
-	# Criaa a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
+	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
 	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste.' "
 
 	# Verifica a existencia do arquivo de projetos
@@ -49,80 +54,84 @@ principal() {
 	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed 's/:/ "/;s/$/"/')
 
 	# Selecao de projeto
-	PROJETO=$(eval $DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
+	PROJETO=$(eval "$DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS")
 
 	# se o projeto for nulo, emitir mensagem e sair
 	if [ -z "$PROJETO" ]; then
-		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum projeto foi selecionado. Operacao cancelada.\" 0 0
+		eval "$DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum projeto foi selecionado. Operacao cancelada.\" 0 0"
 		exit
 	fi
 	# Fim secao dos projetos
+
+	# Verifica a existencia dos arquivos de modulos das gerencias
+	if [ "$PROJETO" = "siig" ]; then
+		ARQUIVO_MODULOS_GPI="$DIR_CONF/${PROJETO}_gpi_modulos"
+		ARQUIVO_MODULOS_GPA="$DIR_CONF/${PROJETO}_gpa_modulos"
+
+		if [ ! -e "$ARQUIVO_MODULOS_GPI" ]; then
+			echo "Afr:Administracao de Frota" > $ARQUIVO_MODULOS_GPI
+			echo "Sco:Controle de Obras" >> $ARQUIVO_MODULOS_GPI
+			echo "Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS_GPI
+		fi
+
+		if [ ! -e "$ARQUIVO_MODULOS_GPA" ]; then
+			echo "Seg:Seguranca" > $ARQUIVO_MODULOS_GPA
+			echo "Cpr:Controle de Processos" >> $ARQUIVO_MODULOS_GPA
+			echo "Aof:Administracao Financeira" >> $ARQUIVO_MODULOS_GPA
+			echo "Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS_GPA
+		fi
+	fi
 
 	# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
 	if [ -e "$ARQUIVO_CONF" ]; then
 		. $ARQUIVO_CONF
 	else
-		USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN e SSH:\" 0 0 \"$USER\")
-		SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN e SSH:\" 0 0 \"192.168.200.12\")
-		SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
+		SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"192.168.200.12\")
 		DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/desenvolvimento/\")
 		DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
-		PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite o numero da porta do SSH:\" 0 0 \"1529\")
 
-		echo "USUARIO=\"$USUARIO\"" > $ARQUIVO_CONF
 		echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
-		echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
 		echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
 		echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
-		echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
 	fi
 
-	CAMINHO_DESTINO="$SERVIDOR:$DIR_DESTINO"
+	# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
+	if [ -e "$ARQUIVO_CONF_USER" ]; then
+		. $ARQUIVO_CONF_USER
+	else
+		USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
+		SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
 
-	# Criar autorizacao para nao pedir senha ao conectar via ssh
-	if [ ! -e "$HOME/.ssh/authorized_keys" ]; then
-		ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "mkdir ~/.ssh ; touch ~/.ssh/authorized_keys"
-		ssh-keygen -t dsa -f ~/.ssh/id_dsa
-		cat ~/.ssh/id_dsa.pub | ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "cat - >> ~/.ssh/authorized_keys"
-		cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+		# Selecao de gerencia
+		GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
+
+		# Converte o conteudo da variavel gerencia para minusculo
+		GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
+
+		# se a gerencia for nula, emitir mensagem e sair
+		if [ -z "$GERENCIA" ]; then
+			eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada. Operacao cancelada.\" 0 0
+			exit
+		fi
+		# Fim secao de gerencia
+
+		echo "USUARIO=\"$USUARIO\"" >> $ARQUIVO_CONF_USER
+		echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF_USER
+		echo "GERENCIA=\"$GERENCIA\"" >> $ARQUIVO_CONF_USER
 	fi
+
+	CAMINHO_DESTINO="$DIR_DESTINO"
 
 	# prepara o diretorio de sincronizacao
-	DIR_TMP_SYNC="$HOME/tmp/$SCRIPT/$PROJETO"
+	DIR_TMP_SYNC="$DIR_CONF_USER/tmp/$PROJETO"
 
 	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
 	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
 
-	# seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao modulo:descricao
-	ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
+	# seleciona os modulos do projeto, no arquivo $PROJETO_$GERENCIA_modulos, com o padrao modulo:descricao
+	ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_${GERENCIA}_modulos"
 	
-	# Verifica a existencia do arquivo de modulos
-	if [ "$PROJETO" = "siig" ]; then
-		if [ ! -e "$ARQUIVO_MODULOS" ]; then
-			# Selecao de gerencia
-			GERENCIA=$(eval $DIALOG --stdout --menu \"Arquivo de modulos nao foi encontrado. Selecione a gerencia para criar o arquivo de modulos do projeto:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
-
-			# se a gerencia for nula, emitir mensagem e sair
-			if [ -z "$GERENCIA" ]; then
-				eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada. Operacao cancelada.\" 0 0
-				exit
-			fi
-			# Fim secao de gerencia
-
-			if [ "$GERENCIA" = "GPI" ]; then
-				echo "Afr:Administracao de Frota" > $ARQUIVO_MODULOS
-				echo "Sco:Controle de Obras" >> $ARQUIVO_MODULOS
-				echo "Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS
-			elif [ "$GERENCIA" = "GPA" ]; then
-				echo "Seg:Seguranca" > $ARQUIVO_MODULOS
-				echo "Cpr:Controle de Processos" >> $ARQUIVO_MODULOS
-				echo "Aof:Administracao Financeira" >> $ARQUIVO_MODULOS
-				echo "Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS
-			fi
-		fi
-	else
-		verificaArquivo "$ARQUIVO_MODULOS"
-	fi
+	verificaArquivo "$ARQUIVO_MODULOS"
 
 	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed 's/:/ "/;s/$/"/')
 
@@ -157,7 +166,7 @@ principal() {
 		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum modulo foi selecionado. Operacao cancelada.\" 0 0
 		exit
 	else
-		# Se o modulo for igual 'Estrutura', deve perguntar se deseja sincronizar os demais diretorios do projeto
+		# Se o modulo for igual 'Demais', deve perguntar se deseja sincronizar os demais diretorios do projeto
 		if [ "$MODULO" = "Demais" ]; then
 			eval $DIALOG --yesno \"Deseja sincronizar as demais pastas do projeto $PROJETO?\" 0 0
 	
@@ -191,7 +200,7 @@ principal() {
 			baixaProjetoSvn
 	
 			# Sincroniza o projeto criando um backup
-			DIR_EXISTE=$(ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "ls $DIR_DESTINO$PROJETO/index.php")
+			DIR_EXISTE=$(ls $DIR_DESTINO$PROJETO/index.php)
 	
 			if [ -z "$DIR_EXISTE" ]; then
 				sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
@@ -228,8 +237,8 @@ sincroniza() {
 	#echo $4 = qualquer parametro do rsync
 
 	# Sincroniza o projeto criando um backup
-	# t
-	rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG -e "ssh -l $USUARIO -p $PORTA_SSH" $1 $2
+	#rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG $1 $2
+	rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
 		
 	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
 	cp $ARQUIVO_LOG $ARQUIVO_LOG.old

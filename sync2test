@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 04/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.01
+# 15/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.02
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -21,6 +21,7 @@ principal() {
 	ARQUIVO_CONF_USER="$DIR_CONF_USER/$SCRIPT.conf"
 
 	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
+	ARQUIVO_GERENCIAS="$DIR_CONF/gerencias"
 
 	# Criacao dos diretorios de configuracao do programa
 	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
@@ -47,15 +48,15 @@ principal() {
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
-		echo "siig:Sistemas Integrados" > $ARQUIVO_PROJETOS
+		echo "projeto:Descricao do projeto" > $ARQUIVO_PROJETOS
 	fi
 
 	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
-	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed 's/:/ "/;s/$/"/')
+	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed "s/:/ '/;s/$/'/")
 
 	while : ; do	
 		# Selecao de projeto
-		PROJETO=$(eval "$DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS")
+		PROJETO=$(eval $DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
 
 		# Se cancelar, sai do programa
 		[ $? -ne 0 ] && break
@@ -65,14 +66,7 @@ principal() {
 			ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
 			if [ ! -e "$ARQUIVO_MODULOS" ]; then
-				echo "gpi:Afr:Administracao de Frota" > $ARQUIVO_MODULOS
-				echo "gpi:Sco:Controle de Obras" >> $ARQUIVO_MODULOS
-				echo "gpi:Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS
-				echo "gpi:Sgc:Controle de Compras" >> $ARQUIVO_MODULOS
-				echo "gpa:Seg:Seguranca" >> $ARQUIVO_MODULOS
-				echo "gpa:Cpr:Controle de Processos" >> $ARQUIVO_MODULOS
-				echo "gpa:Aof:Administracao Financeira" >> $ARQUIVO_MODULOS
-				echo "gpa:Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS
+				echo "gerencia:Modulo:Descricao do modulo" > $ARQUIVO_MODULOS
 			fi
 		fi
 
@@ -99,8 +93,16 @@ principal() {
 		if [ -e "$ARQUIVO_CONF_USER" ]; then
 			. $ARQUIVO_CONF_USER
 		else
+			# Verifica a existencia do arquivo de gerencias
+			if [ ! -e "$ARQUIVO_GERENCIAS" ]; then
+				echo "gerencia:Descricao da gerencia" > $ARQUIVO_GERENCIAS
+			fi
+
+			# seleciona as gerencias, no arquivo gerencias, com o padrao gerencia:descricao
+			LISTA_GERENCIAS=$(sed '-n' 'p' $ARQUIVO_GERENCIAS | sed "s/:/ '/;s/$/'/")
+
 			# Selecao de gerencia
-			GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
+			GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 $LISTA_GERENCIAS)
 
 			# Converte o conteudo da variavel gerencia para minusculo
 			GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
@@ -137,20 +139,7 @@ principal() {
 
 		if [ "$PROJETO" = "siig" ]; then
 			if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-				echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
-				echo "/controller/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/dao/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/database/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/generic/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/template/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/utils/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/model/vo/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/view/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/view/css/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/view/images/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/view/js/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-				echo "/view/style/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/diretorio/ dr" > $ARQUIVO_PROJETO_DEMAIS
 			fi
 		fi
 
@@ -273,21 +262,7 @@ principal() {
 					# Sincroniza as fachadas do modulo
 					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA/model/facade"
 
-					# Prepara o arquivo para nao sincronizar as outras fachadas
-					ARQUIVO_EXCLUDE_MODULOS="$DIR_CONF_USER/.modulos"
-					EXCLUDE_FACADE="$DIR_CONF_USER/.exclude_facade"
-
-					[ -e "$ARQUIVO_EXCLUDE_MODULOS" ] && rm "$ARQUIVO_EXCLUDE_MODULOS"
-
-					while read LINHA
-					do
-						MOD=$(echo $LINHA | cut -d: -f2)
-						echo "$MOD*" >> $ARQUIVO_EXCLUDE_MODULOS
-					done < $ARQUIVO_MODULOS
-
-					sed "/^$FACADE/d" $ARQUIVO_EXCLUDE_MODULOS > $EXCLUDE_FACADE
-
-					sincroniza "$DIR_TMP_SYNC/model/facade/" "$DIR_DESTINO$PROJETO/model/facade/" r --exclude-from=$EXCLUDE_FACADE
+					sincroniza "$DIR_TMP_SYNC/model/facade/" "$DIR_DESTINO$PROJETO/model/facade/" r "SIMULA" "Facades"
 				fi
 
 				exibeResultado
@@ -305,7 +280,7 @@ baixaProjetoSvn() {
 		svn update $DIR_TMP_SYNC
 	else # Senao, executar SVN checkout
 		mkdir -p $DIR_TMP_SYNC
-		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
+ 		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
 	fi
 }
 

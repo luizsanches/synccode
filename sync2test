@@ -1,10 +1,13 @@
 #!/bin/bash
 # sync2test
-# Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 01/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.00
+# Programa de sincronizacao de codigo-fonte entre servidores
+# 04/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.01
 
 principal() {
+	# Altera a mascara padrao do sistema para rwxrwxr-x
+	umask 002
+
 	# Definicao de variaveis do programa
 	SCRIPT="sync2test"
 	VERSAO_SCRIPT=$(sed '/Versao/!d; q' $0)
@@ -40,7 +43,7 @@ principal() {
 	verificaArquivo "/bin/sed"
 
 	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste. ${VERSAO_SCRIPT:2} - Usuario: $USER '"
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza arquivos SVN com servidores de teste e producao. ${VERSAO_SCRIPT:2} - Usuario: $USER '"
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
@@ -65,6 +68,7 @@ principal() {
 				echo "gpi:Afr:Administracao de Frota" > $ARQUIVO_MODULOS
 				echo "gpi:Sco:Controle de Obras" >> $ARQUIVO_MODULOS
 				echo "gpi:Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS
+				echo "gpi:Sgc:Controle de Compras" >> $ARQUIVO_MODULOS
 				echo "gpa:Seg:Seguranca" >> $ARQUIVO_MODULOS
 				echo "gpa:Cpr:Controle de Processos" >> $ARQUIVO_MODULOS
 				echo "gpa:Aof:Administracao Financeira" >> $ARQUIVO_MODULOS
@@ -198,7 +202,8 @@ principal() {
 
 						DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
 
-						DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+						DATA=$(date +%Y-%m-%d)
+						HORA=$(date +%H-%M)
 
 						PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
 
@@ -212,7 +217,7 @@ principal() {
 
 							PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
 
-							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA_HORA"
+							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
 
 							ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
 #echo $ARQUIVO_LOG_PERMANENTE
@@ -228,7 +233,7 @@ principal() {
 
 							ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 
-							DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+							DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
 
 							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
 
@@ -246,9 +251,10 @@ principal() {
 				# Converte o conteudo da variavel modulo para minusculo
 				MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
 
-				DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+				DATA=$(date +%Y-%m-%d)
+				HORA=$(date +%H-%M)
 
-				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
+				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA$ARVORE"
 
 				# Une view/nome do modulo
 				MODULO="$ARVORE$MODULO"
@@ -265,7 +271,7 @@ principal() {
 					sincroniza "$DIR_TMP_SYNC$MODULO" "$DIR_DESTINO$PROJETO$ARVORE" r "SIMULA" "$FACADE"
 
 					# Sincroniza as fachadas do modulo
-					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
+					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA/model/facade"
 
 					# Prepara o arquivo para nao sincronizar as outras fachadas
 					ARQUIVO_EXCLUDE_MODULOS="$DIR_CONF_USER/.modulos"
@@ -315,6 +321,10 @@ sincroniza() {
 	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
 	LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
 	LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
+	ARQUIVO_COM_ESPACO="$DIR_CONF_USER/.tem_espaco"
+
+	# deleta o arquivo de arquivos com espaco
+	[ -e "$ARQUIVO_COM_ESPACO" ] && rm $ARQUIVO_COM_ESPACO
 
 	# deleta o arquivo de log
 	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
@@ -338,48 +348,57 @@ sincroniza() {
 		# Adiciona os arquivos na lista de arquivos para nao sincronizar
 		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE
 
-		# Adiciona os campos para preparar para a caixa de checkbox do dialog
-		sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
-		rm "${LISTA_TMP}1" 
+		# Verifica na lista se existe algum arquivo com espaco em branco no nome
+		sed '/ / !d' $LISTA_EXCLUDE > $ARQUIVO_COM_ESPACO
 
-		# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
-		ARQ_EXCLUDES=$(cat $LISTA_TMP)
+		TEM_ESPACO=$(sed '/ / !d' "$LISTA_EXCLUDE")
 
-		[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
+		if [ -n "$TEM_ESPACO" ]; then
+			eval $DIALOG --title \"Arquivos com espacos\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
+		else
+			# Adiciona os campos para preparar para a caixa de checkbox do dialog
+			sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
+			rm "${LISTA_TMP}1" 
 
-		# Se nao for nula, exibira a caixa com os arquivos para selecao
-		if [ -n "$ARQ_EXCLUDES" ]; then
-			LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"[ $5 ]\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+			# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
+			ARQ_EXCLUDES=$(cat $LISTA_TMP)
 
-			# Se nao cancelou
-			if [ $? -eq 0 ]; then
-				# Se selecionou arquivos
-				if [ -n "$LISTA_SINCRONIZAR" ]; then
-					# Adiciona na lista os arquivos que nao serao sincronizados
-					echo "$LISTA_SINCRONIZAR" | while read LINHA
-					do
-						# Adiciona escape nas barras separadoras dos diretorios
-						LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
+			[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
 
-						# Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
-						sed "/$LINHA_TEMP/d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
+			# Se nao for nula, exibira a caixa com os arquivos para selecao
+			if [ -n "$ARQ_EXCLUDES" ]; then
+				LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"[ $5 ]\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
 
-						mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
-					done
+				# Se nao cancelou
+				if [ $? -eq 0 ]; then
+					# Se selecionou arquivos
+					if [ -n "$LISTA_SINCRONIZAR" ]; then
+						# Adiciona na lista os arquivos que nao serao sincronizados
+						echo "$LISTA_SINCRONIZAR" | while read LINHA
+						do
+							# Adiciona escape nas barras separadoras dos diretorios
+							LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
 
-					# Sincroniza o projeto sem os arquivos selecionados anteriormente
+							# Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
+							sed "/$LINHA_TEMP/d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
 
-					if [ "$6" = "SSH" ]; then # Via SSH
-						rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+							mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
+						done
 
-					else # No mesmo servidor
-						rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+						# Sincroniza o projeto sem os arquivos selecionados anteriormente
+
+						if [ "$6" = "SSH" ]; then # Via SSH
+							rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+
+						else # No mesmo servidor
+							rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+						fi
 					fi
 				fi
+			else
+				# Sincroniza o projeto prevendo delecao de arquivos
+				rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 			fi
-		else
-			# Sincroniza o projeto prevendo delecao de arquivos
-			rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 		fi
 	else
 		# Sincroniza o projeto sem perguntar nada
@@ -398,10 +417,11 @@ sincroniza() {
 sincronizaDiretorio() {
 	#echo $1 = diretorio
 	#echo $2 = opcao do rsync
-	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
-	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
+	DATA=$(date +%Y-%m-%d)
+	HORA=$(date +%H-%M)
+	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA$1"
 
-	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA" "Demais"
+	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA" "$1"
 }
 
 exibeResultado() {

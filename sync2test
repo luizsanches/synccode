@@ -2,7 +2,7 @@
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
 # 22/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.19
+# Versao 0.20
 
 principal() {
 	# Definicao de variaveis do programa
@@ -180,11 +180,6 @@ principal() {
 					# Se cancelar retorna a tela de modulos
 					[ $? -ne 0 ] && break
 
-					eval $DIALOG --yesno \"Confirma a operacao?\" 0 0
-				
-					# Se escolher nao, retorna a tela de opcoes
-					[ $? -ne 0 ] && continue
-
 					if [ "$OPCAO" = "Demais" ]; then
 						# Executa a funcao para baixar o projeto do SVN
 						baixaProjetoSvn
@@ -214,7 +209,7 @@ principal() {
 
 						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO_COMPLETO_SELECIONADO}_${USER}.log"
 
-						sincroniza $PROJETO_COMPLETO r
+						sincroniza $PROJETO_COMPLETO r "SIMULA"
 
 						exibeResultado
 					fi
@@ -298,7 +293,7 @@ sincroniza() {
 	# deleta o arquivo de log
 	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
 
-	# Cria a lista de arquivos que nao seram sincronizados
+	# Cria a lista de arquivos que nao serao sincronizados
 	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
 
 	[ -e "$ARQUIVO_PROJETO_EXCLUDE" ] && cat $ARQUIVO_PROJETO_EXCLUDE > $LISTA_EXCLUDE
@@ -308,21 +303,20 @@ sincroniza() {
 		rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
-		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
 		sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
 		rm "${LISTA_TMP}1" 
 
-		# Mostra os arquivos e opcao para selecionar os que nao seram sincronizados
+		# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
 		ARQ_EXCLUDES=$(cat $LISTA_TMP)
 
 		[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
 
 		if [ -n "$ARQ_EXCLUDES" ]; then
-			NAO_SINC=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Selecione os arquivos que nao seram sincronizados\" 0 0 0 $ARQ_EXCLUDES)
-
+			NAO_SINC=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Selecione os arquivos que nao serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
 			# Se nao cancelou
 			if [ $? -eq 0 ]; then
-				# Adiciona na lista os arquivos que nao seram sincronizados
+				# Adiciona na lista os arquivos que nao serao sincronizados
 				echo "$NAO_SINC" | while read LINHA
 				do
 					echo "$LINHA" >> $LISTA_EXCLUDE
@@ -355,7 +349,7 @@ sincronizaDiretorio() {
 	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
 
-	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2
+	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA"
 }
 
 exibeResultado() {

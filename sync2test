@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 23/11/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.22
+# 24/11/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 0.23
 
 principal() {
 	# Definicao de variaveis do programa
@@ -200,8 +200,6 @@ principal() {
 
 						DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 
-						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
-
 						PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
 
 						# Se o 5o parametro for "SSH" entao sincronizar via ssh
@@ -216,15 +214,19 @@ principal() {
 
 							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA_HORA"
 
+							ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
+#echo $ARQUIVO_LOG_PERMANENTE
 							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
 
-							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO" "SSH"
+ 							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO" "SSH"
 
 						# Senao sincroniza no mesmo servidor
 						else
 							# formata os caminhos de origem e destino, exemplo:
 							# antes.: siig:siig_homologacao
 							# depois: /var/www/siig/ /var/www/siig_homologacao/
+
+							ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 
 							DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
 
@@ -307,7 +309,7 @@ sincroniza() {
 	#echo $3 = r (recursive), a (archive), d (directory)
 	#echo $4 = qualquer parametro do rsync
 	#echo $5 = titulo da janela (nome do modulo/servidor)
-	#echo $6 = modo de comunicacao "SSH" ou vazio
+	#echo $6 = modo de comunicacao SSH ou vazio
 
 	# Seleciona arquivos que nao serao sincronizados
 	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
@@ -325,7 +327,7 @@ sincroniza() {
 	if [ "$4" = "SIMULA" ]; then
 		# Simula (-n) a sincronizacao guardando em arquivo
 		if [ "$6" = "SSH" ]; then
-			rsync -CvzpOu$3 -n -e "ssh -l ${USER} -p ${PORTA_SSH}" --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+			rsync -CvzpOu$3 -n -e "ssh -l $USER -p $PORTA_SSH" --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
 		else
 			rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
 		fi
@@ -368,7 +370,7 @@ sincroniza() {
 					# Sincroniza o projeto sem os arquivos selecionados anteriormente
 
 					if [ "$6" = "SSH" ]; then # Via SSH
-						rsync -CvzpOu$3 -e "ssh -l ${USER} -p ${PORTA_SSH}" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+						rsync -CvzpOu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 
 					else # No mesmo servidor
 						rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2

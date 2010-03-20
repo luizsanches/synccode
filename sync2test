@@ -1,12 +1,14 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 22/09/2009 - Luiz Sanches
-# Versao 0.11
+# 28/09/2009 - Luiz Sanches
+# Versao 0.12
 
 principal() {
 	# Definicao de variaveis do programa
 	SCRIPT="sync2test"
+	VERSAO_SCRIPT=$(sed '/Versao/!d; q' $0)
+
 	DIR_SCRIPT=$(pwd)
 
 	DIR_CONF="/opt/$SCRIPT"
@@ -43,7 +45,7 @@ principal() {
 	verificaArquivo "/bin/sed"
 
 	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste.' "
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste. ${VERSAO_SCRIPT:2}' "
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
@@ -137,6 +139,8 @@ principal() {
 
 	ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
 
+	ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
+
 	if [ "$PROJETO" = "siig" ]; then
 		if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
 			echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
@@ -154,8 +158,8 @@ principal() {
 		fi
 	fi
 
-	if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-		MODULOS_PROJETO="${MODULOS_PROJETO} Demais \"Demais pastas do projeto\""
+	if [ -e "$ARQUIVO_PROJETO_DEMAIS" ] || [ -e "$ARQUIVO_PROJETO_COMPLETO" ]; then
+		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
 	fi
 
 	# Selecao de modulo
@@ -165,58 +169,82 @@ principal() {
 	if [ -z "$MODULO" ]; then
 		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum modulo foi selecionado. Operacao cancelada.\" 0 0
 		exit
-	else
-		# Se o modulo for igual 'Demais', deve perguntar se deseja sincronizar os demais diretorios do projeto
-		if [ "$MODULO" = "Demais" ]; then
-			eval $DIALOG --yesno \"Deseja sincronizar as demais pastas do projeto $PROJETO?\" 0 0
+	fi
+
+	# se escolher a opcao 'Outros'
+	if [ "$MODULO" = "Outros" ]; then
+		LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
+
+		if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+			LISTA_OUTRAS_OPCOES="Demais \"Demais pastas do projeto $PROJETO\" ${LISTA_OUTRAS_OPCOES}" 
+		fi
+
+		# Selecao de outras opcoes
+		OPCAO=$(eval $DIALOG --stdout --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
+
+		# se a opcao for nula, emitir mensagem e sair
+		if [ -z "$OPCAO" ]; then
+			eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma opcao foi selecionada. Operacao cancelada.\" 0 0
+			exit
+		fi
+
+		eval $DIALOG --yesno \"Deseja realizar a operacao?\" 0 0
 	
-			if [ $? = 0 ]; then
+		if [ $? = 0 ]; then # Se escolher sim
+			if [ "$OPCAO" = "Demais" ]; then
 				# Executa a funcao para baixar o projeto do SVN
 				baixaProjetoSvn
-	
+
 				while read LINHA
 				do
 					sincronizaDiretorio "$LINHA"
 				done < $ARQUIVO_PROJETO_DEMAIS
-	
+
 				exibeResultado
-			fi
-		else # Para a escolha de um modulo
-			# Adiciona um nivel de diretorio na variavel modulo
-			ARVORE="/view/"
-			FACADE="$MODULO"
-	
-			# Converte o conteudo da variavel modulo para minusculo
-			MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
-
-			DATA_HORA=$(date +%Y-%m-%d-%H-%M)
-	
-			DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
-	
-			# Une view/nome do modulo
-			MODULO="$ARVORE$MODULO"
-	
-			# Executa a funcao para baixar o projeto do SVN
-			baixaProjetoSvn
-	
-			# Sincroniza o projeto criando um backup
-			DIR_EXISTE=$(ls $DIR_DESTINO$PROJETO/index.php)
-	
-			if [ -z "$DIR_EXISTE" ]; then
-				sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
+			# Outros diretorios
 			else
-				sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra
-			fi
-	
-			# Sincroniza as fachadas do modulo
-			DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
-			cd "$DIR_TMP_SYNC/model/facade/"
-			sincroniza "$FACADE*.php" "$CAMINHO_DESTINO$PROJETO/model/facade/" r
-			cd $DIR_SCRIPT
-			#sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
+				DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
 
-			exibeResultado
+				PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/;s/:/ $DIR_DESTINO_ESCAPE/")
+
+				sincroniza "$PROJETO_COMPLETO" ra
+			fi
 		fi
+	else # Para a escolha de um modulo
+		# Adiciona um nivel de diretorio na variavel modulo
+		ARVORE="/view/"
+		FACADE="$MODULO"
+
+		# Converte o conteudo da variavel modulo para minusculo
+		MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
+
+		DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+
+		DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
+
+		# Une view/nome do modulo
+		MODULO="$ARVORE$MODULO"
+
+		# Executa a funcao para baixar o projeto do SVN
+		baixaProjetoSvn
+
+		# Sincroniza o projeto criando um backup
+		DIR_EXISTE=$(ls $DIR_DESTINO$PROJETO/index.php)
+
+		if [ -z "$DIR_EXISTE" ]; then
+			sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
+		else
+			sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra
+		fi
+
+		# Sincroniza as fachadas do modulo
+		DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
+		cd "$DIR_TMP_SYNC/model/facade/"
+		sincroniza "$FACADE*.php" "$CAMINHO_DESTINO$PROJETO/model/facade/" r
+		cd $DIR_SCRIPT
+		#sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
+
+		exibeResultado
 	fi
 }
 

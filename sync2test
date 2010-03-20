@@ -1,0 +1,44 @@
+#!/bin/bash
+# Script de sincronizacao de codigo-fonte com o servidor de teste
+# 01/09/2009
+# Luiz Sanches
+# Versao 0.1
+
+projeto='siig'
+usuario='luizsanches'
+servidor='192.168.200.12'
+senha_svn='desenv123'
+dir_sync="/tmp/sync2test/$projeto"
+ 
+# comando='mkdir -p ~/backup_siig'
+
+# Selecao de modulo
+modulo=$( dialog \
+	--stdout \
+	--menu "Selecione um modulo do projeto $projeto:" \
+	0 0 0 \
+	sco 'Controle de Obras' \
+	afr 'Administracao de Frota' \
+	gestao 'Sala de Gestao' )
+
+# se o modulo for nulo, emitir mensagem e sair
+if [ -z $modulo ]
+then
+	dialog                                             \
+		--title 'sync2test'                            \
+		--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
+	6 40
+	exit
+else
+	# prepara o diretorio de syncronizacao
+	mkdir -p $dir_sync 2> /dev/null
+
+	# SVN update
+	svn checkout svn://$servidor/var/svn/desenvolvimento/$projeto --username $usuario --password $senha_svn $dir_sync
+
+	# Gera uma copia do diretorio atual
+	#ssh -p 1529 "$usuario@$servidor" "tar -cvzf ~/bkp-$projeto-$modulo-`date +%Y-%m-%d-%H-%M`.tar.gz ~/$projeto/view/$modulo"
+
+	# Sincroniza os projetos
+	rsync -Cravzp -e "ssh -l $usuario -p 1529" $dir_sync/view/$modulo $servidor:/home/$usuario/$projeto/view
+fi

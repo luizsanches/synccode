@@ -1,19 +1,20 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 14/09/2009 - Luiz Sanches
+# 17/09/2009 - Luiz Sanches
 # Colaboradores: Robison Viegas, Vitor Makino
-# Versao 0.9
+# Versao 0.10
 # Funcionalidades da Versao: atualizacao para trabalhar com cygwin
 
 principal() {
 	# Definicao de variaveis do programa
+	SCRIPT="sync2test"
 	DIR_SCRIPT=$(pwd)
-	DIR_CONF="$HOME/.sync2test"
-	ARQUIVO_CONF="$DIR_CONF/sync2test.conf"
+	DIR_CONF="$HOME/.$SCRIPT"
+	ARQUIVO_CONF="$DIR_CONF/$SCRIPT.conf"
 	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
-	ARQUIVO_LOG="$DIR_CONF/.sync2test-temp.log" 
-	ARQUIVO_LOG_PERMANENTE="$DIR_CONF/sync2test.log"
+	ARQUIVO_LOG="$DIR_CONF/.$SCRIPT-temp.log" 
+	ARQUIVO_LOG_PERMANENTE="$DIR_CONF/$SCRIPT.log"
 	PERMISSOES="Fugo+rw,Fugo-x"
 
 	# Criacao do diretorio de configuracao do programa
@@ -36,23 +37,23 @@ principal() {
 	verificaArquivo "/usr/bin/ssh"
 	verificaArquivo "/bin/sed"
 
+	# Criaa a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste.' "
+
 	# Verifica a existencia do arquivo de projetos
-	verificaArquivo "$ARQUIVO_PROJETOS"
+	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
+		echo "siig:Sistemas Integrados" > $ARQUIVO_PROJETOS
+	fi
 
 	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
 	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed 's/:/ "/;s/$/"/')
 
 	# Selecao de projeto
-	PROJETO=$( eval $DIALOG --stdout \
-		--menu "\"Selecione o projeto:\"" \
-		0 0 0 $LISTA_PROJETOS )
+	PROJETO=$(eval $DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
 
 	# se o projeto for nulo, emitir mensagem e sair
 	if [ -z "$PROJETO" ]; then
-		$DIALOG                                             \
-			--title 'sync2test'                            \
-			--msgbox 'Nenhum projeto foi selecionado. Operacao cancelada.'  \
-		6 40
+		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum projeto foi selecionado. Operacao cancelada.\" 0 0
 		exit
 	fi
 	# Fim secao dos projetos
@@ -61,12 +62,12 @@ principal() {
 	if [ -e "$ARQUIVO_CONF" ]; then
 		. $ARQUIVO_CONF
 	else
-		USUARIO=$( $DIALOG --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
-		SERVIDOR=$( $DIALOG --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
-		SENHA_SVN=$( $DIALOG --stdout --passwordbox 'Digite a senha do svn:' 0 0 )
-		DIR_REPOSITORIO=$( $DIALOG --stdout --inputbox 'Digite o caminho do repositorio SVN (com / no final):' 0 0 )
-		DIR_DESTINO=$( $DIALOG --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
-		PORTA_SSH=$( $DIALOG --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
+		USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN e SSH:\" 0 0 \"$USER\")
+		SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN e SSH:\" 0 0 \"192.168.200.12\")
+		SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
+		DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/desenvolvimento/\")
+		DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
+		PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite o numero da porta do SSH:\" 0 0 \"1529\")
 
 		echo "USUARIO=\"$USUARIO\"" > $ARQUIVO_CONF
 		echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
@@ -87,7 +88,7 @@ principal() {
 	fi
 
 	# prepara o diretorio de sincronizacao
-	DIR_TMP_SYNC="$HOME/tmp/sync2test/$PROJETO"
+	DIR_TMP_SYNC="$HOME/tmp/$SCRIPT/$PROJETO"
 
 	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
 	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
@@ -96,32 +97,69 @@ principal() {
 	ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 	
 	# Verifica a existencia do arquivo de modulos
-	verificaArquivo "$ARQUIVO_MODULOS"
+	if [ "$PROJETO" = "siig" ]; then
+		if [ ! -e "$ARQUIVO_MODULOS" ]; then
+			# Selecao de gerencia
+			GERENCIA=$(eval $DIALOG --stdout --menu \"Arquivo de modulos nao foi encontrado. Selecione a gerencia para criar o arquivo de modulos do projeto:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
+
+			# se a gerencia for nula, emitir mensagem e sair
+			if [ -z "$GERENCIA" ]; then
+				eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada. Operacao cancelada.\" 0 0
+				exit
+			fi
+			# Fim secao de gerencia
+
+			if [ "$GERENCIA" = "GPI" ]; then
+				echo "Afr:Administracao de Frota" > $ARQUIVO_MODULOS
+				echo "Sco:Controle de Obras" >> $ARQUIVO_MODULOS
+				echo "Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS
+			elif [ "$GERENCIA" = "GPA" ]; then
+				echo "Seg:Seguranca" > $ARQUIVO_MODULOS
+				echo "Cpr:Controle de Processos" >> $ARQUIVO_MODULOS
+				echo "Aof:Administracao Financeira" >> $ARQUIVO_MODULOS
+				echo "Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS
+			fi
+		fi
+	else
+		verificaArquivo "$ARQUIVO_MODULOS"
+	fi
 
 	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed 's/:/ "/;s/$/"/')
 
 	ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
+
+	if [ "$PROJETO" = "siig" ]; then
+		if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+			echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
+			echo "/controller/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/model/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/model/database/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/model/generic/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/model/template/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/model/utils/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/view/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/view/css/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/view/images/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/view/js/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			echo "/view/style/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+		fi
+	fi
 
 	if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
 		MODULOS_PROJETO="${MODULOS_PROJETO} Demais \"Demais pastas do projeto\""
 	fi
 
 	# Selecao de modulo
-	MODULO=$( eval $DIALOG --stdout \
-		--menu "\"Selecione o modulo do projeto $PROJETO a ser atualizado para o servidor de teste:\"" \
-		0 0 0 $MODULOS_PROJETO )
+	MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto $PROJETO a ser atualizado para o servidor de teste:\" 0 0 0 $MODULOS_PROJETO)
 
 	# se o modulo for nulo, emitir mensagem e sair
 	if [ -z "$MODULO" ]; then
-		$DIALOG                                             \
-			--title 'sync2test'                            \
-			--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
-		6 40
+		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum modulo foi selecionado. Operacao cancelada.\" 0 0
 		exit
 	else
 		# Se o modulo for igual 'Estrutura', deve perguntar se deseja sincronizar os demais diretorios do projeto
 		if [ "$MODULO" = "Demais" ]; then
-			$DIALOG --yesno "Deseja sincronizar as demais pastas do projeto $PROJETO?" 0 0
+			eval $DIALOG --yesno \"Deseja sincronizar as demais pastas do projeto $PROJETO?\" 0 0
 	
 			if [ $? = 0 ]; then
 				# Executa a funcao para baixar o projeto do SVN
@@ -215,15 +253,9 @@ exibeResultado() {
 	CONTEUDO=$(cat $ARQUIVO_LOG)
 
 	if [ -z "$CONTEUDO" ]; then
-		$DIALOG                                             \
-			--title 'sync2test - log da atualizacao'       \
-			--msgbox 'Nenhum arquivo foi atualizado'   \
-		0 0
+		eval $DIALOG --title \"$SCRIPT - log da atualizacao\" --msgbox \"Nenhum arquivo foi atualizado\" 0 0
 	else
-		$DIALOG                                             \
-			--title 'sync2test - log da atualizacao'       \
-			--textbox $ARQUIVO_LOG   \
-		0 0
+		eval $DIALOG --title \"$SCRIPT - log da atualizacao\" --textbox $ARQUIVO_LOG 0 0
 	fi
 	clear
 }

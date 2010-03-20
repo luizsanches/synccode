@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 15/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.02
+# 21/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.03
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -209,7 +209,7 @@ principal() {
 							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
 
 							ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
-#echo $ARQUIVO_LOG_PERMANENTE
+
 							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
 
  							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO" "SSH"
@@ -308,6 +308,9 @@ sincroniza() {
 	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
 
 	[ -e "$ARQUIVO_PROJETO_EXCLUDE" ] && cat $ARQUIVO_PROJETO_EXCLUDE > $LISTA_EXCLUDE
+
+	# Se o arquivo nao foi criado, criar um vazio
+	[ ! -e "$LISTA_EXCLUDE" ] && touch $LISTA_EXCLUDE
 
 	if [ "$4" = "SIMULA" ]; then
 		# Simula (-n) a sincronizacao guardando em arquivo

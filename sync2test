@@ -1,28 +1,36 @@
 #!/bin/bash
 # Script de sincronizacao de codigo-fonte com o servidor de teste
-# 10/09/2009 - Luiz Sanches
-# Versao 0.6
+# 11/09/2009 - Luiz Sanches
+# Colaboradores: Robison Viegas, Vitor Makino
+# Versao 0.7
 
 principal() {
+	if [ "$DISPLAY" ]; then
+		DIALOG=Xdialog
+	else
+		DIALOG=dialog
+	fi
+
 	DIR_SCRIPT=$(pwd)
 	PROJETO="siig"
 	ARQUIVO_CONF="$HOME/.sync2test"
+	ARQUIVO_MODULOS="$DIR_SCRIPT/.$PROJETO"_modulos
 
-	# Verifica a existencia do programa dialog
-	if [ ! -e "/usr/bin/dialog" ]; then
-		echo "ATENCAO! E necessario instalar o programa 'dialog'."
+	# Verifica a existencia do programa $DIALOG
+	if [ ! -e "/usr/bin/$DIALOG" ]; then
+		echo "ATENCAO! E necessario instalar o programa '$DIALOG'."
 		exit
 	fi
 
 	# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
-	if [ -e $ARQUIVO_CONF ]; then
+	if [ -e "$ARQUIVO_CONF" ]; then
 		. $ARQUIVO_CONF
 	else
-		USUARIO=$( dialog --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
-		SERVIDOR=$( dialog --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
-		SENHA_SVN=$( dialog --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
-		DIR_DESTINO=$( dialog --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
-		PORTA_SSH=$( dialog --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
+		USUARIO=$( $DIALOG --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
+		SERVIDOR=$( $DIALOG --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
+		SENHA_SVN=$( $DIALOG --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
+		DIR_DESTINO=$( $DIALOG --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
+		PORTA_SSH=$( $DIALOG --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
 
 		echo "USUARIO=\"$USUARIO\"" > $ARQUIVO_CONF
 		echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
@@ -54,19 +62,26 @@ principal() {
 	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
 	rm $ARQUIVO_LOG 2> /dev/null
 
+	# seleciona os modulos do projeto com o padrao modulo:descricao
+	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed "s/:/ '/;s/$/'/" | paste -s)
+
+#	echo $MODULOS_PROJETO
+#	exit
+#	Afr "Administracao de Frota" Sco "Controle de Obras" Gestao "Sala de Gestao" \
+
 	# Selecao de modulo
-	MODULO=$( dialog \
+	MODULO=$( $DIALOG \
 		--stdout \
 		--menu "Selecione o modulo do $PROJETO a ser atualizado para o servidor de teste:" \
 		0 0 0 \
-		Sco 'Controle de Obras' \
-		Afr 'Administracao de Frota' \
-		Gestao 'Sala de Gestao' \
-		Estrutura 'Demais diretorios do projeto')
+		$MODULOS_PROJETO \
+		Estrutura "Demais diretorios do projeto")
+
+#		$MODULOS_PROJETO
 
 	# se o modulo for nulo, emitir mensagem e sair
 	if [ -z $MODULO ]; then
-		dialog                                             \
+		$DIALOG                                             \
 			--title 'sync2test'                            \
 			--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
 		6 40
@@ -74,7 +89,7 @@ principal() {
 	else
 		# Se o modulo for igual 'Estrutura', deve perguntar se deseja sincronizar os demais diretorios do projeto
 		if [ $MODULO = "Estrutura" ]; then
-			dialog --yesno "Deseja sincronizar as demais pastas do projeto $PROJETO?" 0 0
+			$DIALOG --yesno "Deseja sincronizar as demais pastas do projeto $PROJETO?" 0 0
 	
 			if [ $? = 0 ]; then
 				# Executa a funcao para baixar o projeto do SVN
@@ -126,7 +141,7 @@ principal() {
 			DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO/model/facade/$DATA_HORA"
 			cd $DIR_TMP_SYNC/model/facade/
 			sincroniza "$FACADE*.php" $CAMINHO_DESTINO$PROJETO/model/facade/ r
-			cd -
+			cd $DIR_SCRIPT
 			#sincroniza $DIR_TMP_SYNC/model/facade/ $CAMINHO_DESTINO$PROJETO/model/facade/ r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
 
 			exibeResultado
@@ -136,10 +151,10 @@ principal() {
 
 baixaProjetoSvn() {
 	# Se o diretorio existir executar SVN update
-	if [ -e $DIR_TMP_SYNC ]; then
+	if [ -e "$DIR_TMP_SYNC" ]; then
 		svn update $DIR_TMP_SYNC
-	else # Senao executar SVN checkout
-		mkdir -p $DIR_TMP_SYNC 2> /dev/null
+	else # Senao, executar SVN checkout
+		mkdir -p $DIR_TMP_SYNC #2> /dev/null
 		svn checkout svn://$SERVIDOR/var/svn/desenvolvimento/$PROJETO --username $USUARIO --password $SENHA_SVN $DIR_TMP_SYNC
 	fi
 }
@@ -174,12 +189,12 @@ exibeResultado() {
 	CONTEUDO=$(cat $ARQUIVO_LOG)
 
 	if [ -z "$CONTEUDO" ]; then
-		dialog                                             \
+		$DIALOG                                             \
 			--title 'sync2test - log da atualizacao'       \
 			--msgbox 'Nenhum arquivo foi atualizado'   \
 		0 0
 	else
-		dialog                                             \
+		$DIALOG                                             \
 			--title 'sync2test - log da atualizacao'       \
 			--textbox $ARQUIVO_LOG   \
 		0 0

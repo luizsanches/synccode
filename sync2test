@@ -1,9 +1,10 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 12/09/2009 - Luiz Sanches
+# 14/09/2009 - Luiz Sanches
 # Colaboradores: Robison Viegas, Vitor Makino
-# Versao 0.8
+# Versao 0.9
+# Funcionalidades da Versao: atualizacao para trabalhar com cygwin
 
 principal() {
 	# Definicao de variaveis do programa
@@ -86,7 +87,7 @@ principal() {
 	fi
 
 	# prepara o diretorio de sincronizacao
-	DIR_TMP_SYNC="/tmp/sync2test/$PROJETO"
+	DIR_TMP_SYNC="$HOME/tmp/sync2test/$PROJETO"
 
 	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
 	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
@@ -143,7 +144,7 @@ principal() {
 
 			DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	
-			DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
+			DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
 	
 			# Une view/nome do modulo
 			MODULO="$ARVORE$MODULO"
@@ -152,7 +153,7 @@ principal() {
 			baixaProjetoSvn
 	
 			# Sincroniza o projeto criando um backup
-			DIR_EXISTE=$(ssh -p $PORTA_SSH $USUARIO@$SERVIDOR "ls $DIR_DESTINO$PROJETO/index.php")
+			DIR_EXISTE=$(ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "ls $DIR_DESTINO$PROJETO/index.php")
 	
 			if [ -z "$DIR_EXISTE" ]; then
 				sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
@@ -161,11 +162,11 @@ principal() {
 			fi
 	
 			# Sincroniza as fachadas do modulo
-			DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO/model/facade/$DATA_HORA"
-			cd $DIR_TMP_SYNC/model/facade/
-			sincroniza "$FACADE*.php" $CAMINHO_DESTINO$PROJETO/model/facade/ r
+			DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
+			cd "$DIR_TMP_SYNC/model/facade/"
+			sincroniza "$FACADE*.php" "$CAMINHO_DESTINO$PROJETO/model/facade/" r
 			cd $DIR_SCRIPT
-			#sincroniza $DIR_TMP_SYNC/model/facade/ $CAMINHO_DESTINO$PROJETO/model/facade/ r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
+			#sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
 
 			exibeResultado
 		fi
@@ -189,11 +190,12 @@ sincroniza() {
 	#echo $4 = qualquer parametro do rsync
 
 	# Sincroniza o projeto criando um backup
-	rsync -Cvzpt$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG -e "ssh -l $USUARIO -p $PORTA_SSH" $1 $2
+	# t
+	rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG -e "ssh -l $USUARIO -p $PORTA_SSH" $1 $2
 		
 	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
 	cp $ARQUIVO_LOG $ARQUIVO_LOG.old
-	sed "/building/,+1d;/sent/,+1d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
+	sed "/building/ d;/done/ d;/sent/,+1 d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
 	rm $ARQUIVO_LOG.old
 
 	# Atualiza o arquivo de log permanente
@@ -204,7 +206,7 @@ sincronizaDiretorio() {
 	#echo $1 = diretorio
 	#echo $2 = opcao do rsync
 	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
-	DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO$1$DATA_HORA"
+	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
 
 	sincroniza "$DIR_TMP_SYNC$1" "$CAMINHO_DESTINO$PROJETO$1" $2
 }

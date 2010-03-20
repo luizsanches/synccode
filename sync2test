@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script de sincronizacao de codigo-fonte com o servidor de teste
-# 03/09/2009 - Luiz Sanches
-# Versao 0.3
+# 08/09/2009 - Luiz Sanches
+# Versao 0.4
 
 projeto="siig"
 
@@ -18,36 +18,41 @@ else
 	usuario=$( dialog --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
 	servidor=$( dialog --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
 	senha_svn=$( dialog --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
-	destino=$( dialog --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
+	dir_destino=$( dialog --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
+	porta_ssh=$( dialog --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
 
 	echo "usuario=\"$usuario\"" > /home/$USER/.sync2test
 	echo "servidor=\"$servidor\"" >> /home/$USER/.sync2test
 	echo "senha_svn=\"$senha_svn\"" >> /home/$USER/.sync2test
-	echo "dir_destino=\"$servidor:$destino\"" >> /home/$USER/.sync2test
+	echo "dir_destino=\"$dir_destino\"" >> /home/$USER/.sync2test
+	echo "porta_ssh=\"$porta_ssh\"" >> /home/$USER/.sync2test
 fi
 
-# Criar autorizacao para nao pedir senha ao conectar via ssh
-#if [ ! -e "/home/$USER/.ssh/authorized_keys" ]; then
-#	ssh -p 1529 $usuario@$servidor 'mkdir ~/.ssh ; touch ~/.ssh/authorized_keys'
-#	ssh-keygen -t dsa -f ~/.ssh/id_dsa
-#	cat ~/.ssh/id_dsa.pub | ssh $usuario@$servidor 'cat - >> ~/.ssh/authorized_keys'
-#	cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
-#fi
+caminho_destino=$servidor:$dir_destino
 
-arquivo_log=".sync2test-temp.log" 
-arquivo_log_permanente="sync2test.log"
+# Criar autorizacao para nao pedir senha ao conectar via ssh
+if [ ! -e "/home/$USER/.ssh/authorized_keys" ]; then
+	ssh -p $porta_ssh $usuario@$servidor 'mkdir ~/.ssh ; touch ~/.ssh/authorized_keys'
+	ssh-keygen -t dsa -f ~/.ssh/id_dsa
+	cat ~/.ssh/id_dsa.pub | ssh -p $porta_ssh $usuario@$servidor 'cat - >> ~/.ssh/authorized_keys'
+	cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+fi
+
+arquivo_log="/home/$USER/.sync2test-temp.log" 
+arquivo_log_permanente="/home/$USER/.sync2test.log"
+#permissoes="Du+wrx,Dgo+rx,Fugo+r,Fu+w,Fgo-w,Fugo-x"
+permissoes="Fugo+r,Fu+w,Fgo-w,Fugo-x"
 
 # deleta o arquivo de log para mostrar somente a ultima sincronizacao
-rm $arquivo_log
+rm $arquivo_log 2> /dev/null
 
 # Selecao de modulo
 modulo=$( dialog \
 	--stdout \
-	--menu "Selecione o modulo a ser atualizado para o servidor de teste:" \
+	--menu "Selecione o modulo do $projeto a ser atualizado para o servidor de teste:" \
 	0 0 0 \
 	Sco 'Controle de Obras' \
-	Afr 'Administracao de Frota' \
-	Gestao 'Sala de Gestao' )
+	Afr 'Administracao de Frota' )
 
 # se o modulo for nulo, emitir mensagem e sair
 if [ -z $modulo ]
@@ -68,7 +73,7 @@ else
 	# prepara o diretorio de sincronizacao
 	dir_tmp_sync="/tmp/sync2test/$projeto"
 
-	dir_backup="$dir_destinobkp-$projeto-$modulo/`date +%Y-%m-%d-%H-%M`"
+	dir_backup=$dir_destino"bkp-$projeto-$modulo/`date +%Y-%m-%d-%H-%M`"
 
 	# Une view/nome do modulo
 	modulo=$arvore$modulo
@@ -78,24 +83,22 @@ else
 		svn update $dir_tmp_sync
 	else # Senao executar SVN checkout
 		mkdir -p $dir_tmp_sync 2> /dev/null
-		echo "checkout"
 		svn checkout svn://$servidor/var/svn/desenvolvimento/$projeto --username $usuario --password $senha_svn $dir_tmp_sync
 	fi
 
 	# Sincroniza o projeto criando um backup
-	dir_existe=$(ssh -p 1529 $usuario@$servidor "ls $projeto")
+	dir_existe=$(ssh -p $porta_ssh $usuario@$servidor "ls $dir_destino$projeto/index.php")
 
 	if [ -z $dir_existe ]; then
-		rsync -Cravzp -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p 1529" $dir_tmp_sync $dir_destino
+		rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $dir_tmp_sync $caminho_destino
 	else
-		rsync -Cravzp -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p 1529" $dir_tmp_sync$modulo $dir_destino$projeto$arvore
+		rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $dir_tmp_sync$modulo $caminho_destino$projeto$arvore
 	fi
 
 	# Sincroniza as fachadas do modulo
 	cd $dir_tmp_sync/model/facade
-	rsync -Cravzp -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -t -e "ssh -l $usuario -p 1529" $facade*.php $dir_destino$projeto/model/facade/
+	rsync -Cravzp --chmod=$permissoes -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -e "ssh -l $usuario -p $porta_ssh" $facade*.php $caminho_destino$projeto/model/facade/
 	cd -
-	#rsync -Cravzp -h -b --backup-dir=$dir_backup --delete --log-file=$arquivo_log -t -e "ssh -l $usuario -p 1529" "$dir_tmp_sync/model/facade/" "$dir_destino$projeto/model/facade/"
 
 	# Atualiza o arquivo de log permanente
 	cat $arquivo_log >> $arquivo_log_permanente

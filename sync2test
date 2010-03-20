@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 01/10/2009 - Luiz Sanches
-# Versao 0.14
+# 02/10/2009 - Luiz Sanches
+# Versao 0.15
 
 principal() {
 	# Definicao de variaveis do programa
@@ -243,7 +243,7 @@ principal() {
 		if [ -z "$DIR_EXISTE" ]; then
 			sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
 		else
-			sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra
+			sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra --exclude='sco/arquivos/'
 		fi
 
 		# Sincroniza as fachadas do modulo

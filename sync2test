@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 09/10/2009 - Luiz Sanches
-# Versao 0.17
+# 10/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 0.18
 
 principal() {
 	# Definicao de variaveis do programa
@@ -18,9 +18,6 @@ principal() {
 	ARQUIVO_CONF_USER="$DIR_CONF_USER/$SCRIPT.conf"
 
 	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
-
-	ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log" 
-	ARQUIVO_LOG_PERMANENTE="$DIR_CONF_USER/$SCRIPT.log"
 
 	# Criacao dos diretorios de configuracao do programa
 	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
@@ -65,13 +62,13 @@ principal() {
 			ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
 			if [ ! -e "$ARQUIVO_MODULOS" ]; then
-				echo "gpi:Afr:Administracao de Frota" > $ARQUIVO_MODULOS_GPI
-				echo "gpi:Sco:Controle de Obras" >> $ARQUIVO_MODULOS_GPI
-				echo "gpi:Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS_GPI
-				echo "gpa:Seg:Seguranca" > $ARQUIVO_MODULOS_GPA
-				echo "gpa:Cpr:Controle de Processos" >> $ARQUIVO_MODULOS_GPA
-				echo "gpa:Aof:Administracao Financeira" >> $ARQUIVO_MODULOS_GPA
-				echo "gpa:Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS_GPA
+				echo "gpi:Afr:Administracao de Frota" > $ARQUIVO_MODULOS
+				echo "gpi:Sco:Controle de Obras" >> $ARQUIVO_MODULOS
+				echo "gpi:Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS
+				echo "gpa:Seg:Seguranca" >> $ARQUIVO_MODULOS
+				echo "gpa:Cpr:Controle de Processos" >> $ARQUIVO_MODULOS
+				echo "gpa:Aof:Administracao Financeira" >> $ARQUIVO_MODULOS
+				echo "gpa:Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS
 			fi
 		fi
 
@@ -79,22 +76,23 @@ principal() {
 		if [ -e "$ARQUIVO_CONF" ]; then
 			. $ARQUIVO_CONF
 		else
-			SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"192.168.200.12\")
-			DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/desenvolvimento/\")
+			SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"ip\")
+			DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/\")
 			DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
+			USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
+			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
 
-			echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
+			echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
 			echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
 			echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
+			echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
+			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
 		fi
 
 		# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
 		if [ -e "$ARQUIVO_CONF_USER" ]; then
 			. $ARQUIVO_CONF_USER
 		else
-			USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
-			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
-
 			# Selecao de gerencia
 			GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
 
@@ -106,19 +104,21 @@ principal() {
 				eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada.\" 0 0
 				continue
 			fi
-			# Fim secao de gerencia
 
-			echo "USUARIO=\"$USUARIO\"" >> $ARQUIVO_CONF_USER
-			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF_USER
-			echo "GERENCIA=\"$GERENCIA\"" >> $ARQUIVO_CONF_USER
+			echo "GERENCIA=\"$GERENCIA\"" > $ARQUIVO_CONF_USER
 		fi
 
-		CAMINHO_DESTINO="$DIR_DESTINO"
+		# Arquivos de log
+		ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log"
+		DIR_LOG_PERMANENTE="$DIR_DESTINO/.$SCRIPT/log"
+		ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO}_${USER}.log"
 
-		# prepara o diretorio de sincronizacao
-		DIR_TMP_SYNC="$DIR_CONF_USER/tmp/$PROJETO"
+		[ ! -e "$DIR_LOG_PERMANENTE" ] && mkdir -p $DIR_LOG_PERMANENTE
 
-		# seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao gerencia:modulo:descricao
+		# Prepara o diretorio de sincronizacao
+		DIR_TMP_SYNC="${DIR_DESTINO}.$SCRIPT/$PROJETO"
+
+		# Seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao gerencia:modulo:descricao
 		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 		
 		verificaArquivo "$ARQUIVO_MODULOS"
@@ -206,9 +206,13 @@ principal() {
 						# depois: /var/www/siig/ /var/www/siig_homologacao/
 						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
 
+						PROJETO_COMPLETO_SELECIONADO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+
 						DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 
 						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+
+						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO_COMPLETO_SELECIONADO}_${USER}.log"
 
 						sincroniza $PROJETO_COMPLETO r
 
@@ -236,10 +240,10 @@ principal() {
 				# Sincroniza o projeto criando um backup
 				# Se o diretorio do projeto nao existir, sincroniza tudo
 				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
-					sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO a
+					sincroniza $DIR_TMP_SYNC $DIR_DESTINO a
 				# Se existir, sincroniza somente os diretorios do modulo selecionado
 				else
-					sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" r "SIMULA"
+					sincroniza "$DIR_TMP_SYNC$MODULO" "$DIR_DESTINO$PROJETO$ARVORE" r "SIMULA"
 
 					# Sincroniza as fachadas do modulo
 					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
@@ -258,7 +262,7 @@ principal() {
 
 					sed "/^$FACADE/d" $ARQUIVO_EXCLUDE_MODULOS > $EXCLUDE_FACADE
 
-					sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --exclude-from=$EXCLUDE_FACADE
+					sincroniza "$DIR_TMP_SYNC/model/facade/" "$DIR_DESTINO$PROJETO/model/facade/" r --exclude-from=$EXCLUDE_FACADE
 				fi
 
 				exibeResultado
@@ -276,7 +280,7 @@ baixaProjetoSvn() {
 		svn update $DIR_TMP_SYNC
 	else # Senao, executar SVN checkout
 		mkdir -p $DIR_TMP_SYNC
-		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO --password $SENHA_SVN $DIR_TMP_SYNC
+		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
 	fi
 }
 
@@ -289,7 +293,7 @@ sincroniza() {
 	# Seleciona arquivos que nao serao sincronizados
 	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
 	LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
-	LISTA_TMP="$DIR_CONF_USER/.lista"
+	LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
 
 	# Cria a lista de arquivos que nao seram sincronizados
 	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
@@ -308,8 +312,10 @@ sincroniza() {
 		# Mostra os arquivos e opcao para selecionar os que nao seram sincronizados
 		ARQ_EXCLUDES=$(cat $LISTA_TMP)
 
+		[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
+
 		if [ -n "$ARQ_EXCLUDES" ]; then
-			NAO_SINC=$(eval $DIALOG --stdout --separate-output --checklist \"Selecione os arquivos que nao seram sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+			NAO_SINC=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Selecione os arquivos que nao seram sincronizados\" 0 0 0 $ARQ_EXCLUDES)
 
 			# Se nao cancelou
 			if [ $? -eq 0 ]; then
@@ -331,7 +337,7 @@ sincroniza() {
 		rsync -CvzpOu$3 $4 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 	fi
 
-	if [ -e $ARQUIVO_LOG ]; then
+	if [ -e "$ARQUIVO_LOG" ]; then
 		# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
 		cp $ARQUIVO_LOG "$ARQUIVO_LOG.old"
 		sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "$ARQUIVO_LOG.old" > $ARQUIVO_LOG
@@ -348,16 +354,16 @@ sincronizaDiretorio() {
 	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
 
-	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$CAMINHO_DESTINO$PROJETO$1" $2
+	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2
 }
 
 exibeResultado() {
 	CONTEUDO=$(cat $ARQUIVO_LOG)
 
 	if [ -z "$CONTEUDO" ]; then
-		eval $DIALOG --title \"$SCRIPT - log da atualizacao\" --msgbox \"Nenhum arquivo foi atualizado\" 0 0
+		eval $DIALOG --title \"log da atualizacao\" --msgbox \"Nenhum arquivo foi atualizado\" 0 0
 	else
-		eval $DIALOG --title \"$SCRIPT - log da atualizacao\" --textbox $ARQUIVO_LOG 0 0
+		eval $DIALOG --title \"log da atualizacao\" --textbox $ARQUIVO_LOG 0 0
 	fi
 }
 

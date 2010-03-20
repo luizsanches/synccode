@@ -1,26 +1,60 @@
 #!/bin/bash
-# Script de sincronizacao de codigo-fonte com o servidor de teste
-# 11/09/2009 - Luiz Sanches
+# sync2test
+# Programa de sincronizacao de codigo-fonte com o servidor de teste
+# 12/09/2009 - Luiz Sanches
 # Colaboradores: Robison Viegas, Vitor Makino
-# Versao 0.7
+# Versao 0.8
 
 principal() {
+	# Definicao de variaveis do programa
+	DIR_SCRIPT=$(pwd)
+	DIR_CONF="$HOME/.sync2test"
+	ARQUIVO_CONF="$DIR_CONF/sync2test.conf"
+	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
+	ARQUIVO_LOG="$DIR_CONF/.sync2test-temp.log" 
+	ARQUIVO_LOG_PERMANENTE="$DIR_CONF/sync2test.log"
+	PERMISSOES="Fugo+rw,Fugo-x"
+
+	# Criacao do diretorio de configuracao do programa
+	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
+
+	# Definicao do program de dialogo como o usuario
 	if [ "$DISPLAY" ]; then
-		DIALOG=Xdialog
+		DIALOG="Xdialog"
+
+		# Verifica a existencia do programa Xdialog
+		[ ! -e "/usr/bin/$DIALOG" ] && DIALOG="dialog"
 	else
-		DIALOG=dialog
+		DIALOG="dialog"
 	fi
 
-	DIR_SCRIPT=$(pwd)
-	PROJETO="siig"
-	ARQUIVO_CONF="$HOME/.sync2test"
-	ARQUIVO_MODULOS="$DIR_SCRIPT/.$PROJETO"_modulos
+	# Verifica a existencia dos programas
+	verificaArquivo "/usr/bin/$DIALOG"
+	verificaArquivo "/usr/bin/svn"
+	verificaArquivo "/usr/bin/rsync"
+	verificaArquivo "/usr/bin/ssh"
+	verificaArquivo "/bin/sed"
 
-	# Verifica a existencia do programa $DIALOG
-	if [ ! -e "/usr/bin/$DIALOG" ]; then
-		echo "ATENCAO! E necessario instalar o programa '$DIALOG'."
+	# Verifica a existencia do arquivo de projetos
+	verificaArquivo "$ARQUIVO_PROJETOS"
+
+	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
+	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed 's/:/ "/;s/$/"/')
+
+	# Selecao de projeto
+	PROJETO=$( eval $DIALOG --stdout \
+		--menu "\"Selecione o projeto:\"" \
+		0 0 0 $LISTA_PROJETOS )
+
+	# se o projeto for nulo, emitir mensagem e sair
+	if [ -z "$PROJETO" ]; then
+		$DIALOG                                             \
+			--title 'sync2test'                            \
+			--msgbox 'Nenhum projeto foi selecionado. Operacao cancelada.'  \
+		6 40
 		exit
 	fi
+	# Fim secao dos projetos
 
 	# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
 	if [ -e "$ARQUIVO_CONF" ]; then
@@ -28,59 +62,56 @@ principal() {
 	else
 		USUARIO=$( $DIALOG --stdout --inputbox 'Digite o nome do usuario:' 0 0 )
 		SERVIDOR=$( $DIALOG --stdout --inputbox 'Digite o endereco do servidor:' 0 0 )
-		SENHA_SVN=$( $DIALOG --stdout --passwordbox 'Digite a senha do svn:' 0 0 )	
+		SENHA_SVN=$( $DIALOG --stdout --passwordbox 'Digite a senha do svn:' 0 0 )
+		DIR_REPOSITORIO=$( $DIALOG --stdout --inputbox 'Digite o caminho do repositorio SVN (com / no final):' 0 0 )
 		DIR_DESTINO=$( $DIALOG --stdout --inputbox 'Digite o diretorio de destino (com / no final):' 0 0 )
 		PORTA_SSH=$( $DIALOG --stdout --inputbox 'Digite o numero da porta do SSH:' 0 0 )
 
 		echo "USUARIO=\"$USUARIO\"" > $ARQUIVO_CONF
 		echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
 		echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
+		echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
 		echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
 		echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
 	fi
 
-	CAMINHO_DESTINO=$SERVIDOR:$DIR_DESTINO
+	CAMINHO_DESTINO="$SERVIDOR:$DIR_DESTINO"
 
 	# Criar autorizacao para nao pedir senha ao conectar via ssh
 	if [ ! -e "$HOME/.ssh/authorized_keys" ]; then
-		ssh -p $PORTA_SSH $USUARIO@$SERVIDOR 'mkdir ~/.ssh ; touch ~/.ssh/authorized_keys'
+		ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "mkdir ~/.ssh ; touch ~/.ssh/authorized_keys"
 		ssh-keygen -t dsa -f ~/.ssh/id_dsa
-		cat ~/.ssh/id_dsa.pub | ssh -p $PORTA_SSH $USUARIO@$SERVIDOR 'cat - >> ~/.ssh/authorized_keys'
+		cat ~/.ssh/id_dsa.pub | ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "cat - >> ~/.ssh/authorized_keys"
 		cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
 	fi
-
-	ARQUIVO_LOG="$HOME/.sync2test-temp.log" 
-	ARQUIVO_LOG_PERMANENTE="$HOME/.sync2test.log"
-
-	#PERMISSOES="Du+wrx,Dgo+rx,Fugo+r,Fu+w,Fgo-w,Fugo-x"
-	#PERMISSOES="Fugo+r,Fu+w,Fgo-w,Fugo-x"
-	PERMISSOES="Fugo+rw,Fugo-x"
 
 	# prepara o diretorio de sincronizacao
 	DIR_TMP_SYNC="/tmp/sync2test/$PROJETO"
 
 	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
-	rm $ARQUIVO_LOG 2> /dev/null
+	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
 
-	# seleciona os modulos do projeto com o padrao modulo:descricao
-	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed "s/:/ '/;s/$/'/" | paste -s)
+	# seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao modulo:descricao
+	ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
+	
+	# Verifica a existencia do arquivo de modulos
+	verificaArquivo "$ARQUIVO_MODULOS"
 
-#	echo $MODULOS_PROJETO
-#	exit
-#	Afr "Administracao de Frota" Sco "Controle de Obras" Gestao "Sala de Gestao" \
+	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed 's/:/ "/;s/$/"/')
+
+	ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
+
+	if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+		MODULOS_PROJETO="${MODULOS_PROJETO} Demais \"Demais pastas do projeto\""
+	fi
 
 	# Selecao de modulo
-	MODULO=$( $DIALOG \
-		--stdout \
-		--menu "Selecione o modulo do $PROJETO a ser atualizado para o servidor de teste:" \
-		0 0 0 \
-		$MODULOS_PROJETO \
-		Estrutura "Demais diretorios do projeto")
-
-#		$MODULOS_PROJETO
+	MODULO=$( eval $DIALOG --stdout \
+		--menu "\"Selecione o modulo do projeto $PROJETO a ser atualizado para o servidor de teste:\"" \
+		0 0 0 $MODULOS_PROJETO )
 
 	# se o modulo for nulo, emitir mensagem e sair
-	if [ -z $MODULO ]; then
+	if [ -z "$MODULO" ]; then
 		$DIALOG                                             \
 			--title 'sync2test'                            \
 			--msgbox 'Nenhum modulo foi selecionado. Operacao cancelada.'  \
@@ -88,42 +119,34 @@ principal() {
 		exit
 	else
 		# Se o modulo for igual 'Estrutura', deve perguntar se deseja sincronizar os demais diretorios do projeto
-		if [ $MODULO = "Estrutura" ]; then
+		if [ "$MODULO" = "Demais" ]; then
 			$DIALOG --yesno "Deseja sincronizar as demais pastas do projeto $PROJETO?" 0 0
 	
 			if [ $? = 0 ]; then
 				# Executa a funcao para baixar o projeto do SVN
 				baixaProjetoSvn
-		
-				sincronizaDiretorio /config/ d
-				sincronizaDiretorio /controller/ d
-				sincronizaDiretorio /model/ d
-				sincronizaDiretorio /model/database/ d
-				sincronizaDiretorio /model/generic/ d
-				sincronizaDiretorio /model/template/ dr
-				sincronizaDiretorio /model/utils/ dr
-				sincronizaDiretorio /view/ d
-				sincronizaDiretorio /view/css/ dr
-				sincronizaDiretorio /view/images/ dr
-				sincronizaDiretorio /view/js/ dr
-				sincronizaDiretorio /view/style/ dr
+	
+				while read LINHA
+				do
+					sincronizaDiretorio "$LINHA"
+				done < $ARQUIVO_PROJETO_DEMAIS
 	
 				exibeResultado
 			fi
-		else # Para a escolha de um projeto
+		else # Para a escolha de um modulo
 			# Adiciona um nivel de diretorio na variavel modulo
 			ARVORE="/view/"
-			FACADE=$MODULO
+			FACADE="$MODULO"
 	
 			# Converte o conteudo da variavel modulo para minusculo
 			MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
 
-			DATA_HORA=`date +%Y-%m-%d-%H-%M`
+			DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	
 			DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
 	
 			# Une view/nome do modulo
-			MODULO=$ARVORE$MODULO
+			MODULO="$ARVORE$MODULO"
 	
 			# Executa a funcao para baixar o projeto do SVN
 			baixaProjetoSvn
@@ -131,10 +154,10 @@ principal() {
 			# Sincroniza o projeto criando um backup
 			DIR_EXISTE=$(ssh -p $PORTA_SSH $USUARIO@$SERVIDOR "ls $DIR_DESTINO$PROJETO/index.php")
 	
-			if [ -z $DIR_EXISTE ]; then
+			if [ -z "$DIR_EXISTE" ]; then
 				sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
 			else
-				sincroniza $DIR_TMP_SYNC$MODULO $CAMINHO_DESTINO$PROJETO$ARVORE ra
+				sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra
 			fi
 	
 			# Sincroniza as fachadas do modulo
@@ -154,8 +177,8 @@ baixaProjetoSvn() {
 	if [ -e "$DIR_TMP_SYNC" ]; then
 		svn update $DIR_TMP_SYNC
 	else # Senao, executar SVN checkout
-		mkdir -p $DIR_TMP_SYNC #2> /dev/null
-		svn checkout svn://$SERVIDOR/var/svn/desenvolvimento/$PROJETO --username $USUARIO --password $SENHA_SVN $DIR_TMP_SYNC
+		mkdir -p $DIR_TMP_SYNC
+		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO --password $SENHA_SVN $DIR_TMP_SYNC
 	fi
 }
 
@@ -170,7 +193,7 @@ sincroniza() {
 		
 	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
 	cp $ARQUIVO_LOG $ARQUIVO_LOG.old
-	sed '/building/,+1d;/sent/,+1d' $ARQUIVO_LOG.old > $ARQUIVO_LOG
+	sed "/building/,+1d;/sent/,+1d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
 	rm $ARQUIVO_LOG.old
 
 	# Atualiza o arquivo de log permanente
@@ -180,9 +203,10 @@ sincroniza() {
 sincronizaDiretorio() {
 	#echo $1 = diretorio
 	#echo $2 = opcao do rsync
-	DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO$1`date +%Y-%m-%d-%H-%M`"
+	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+	DIR_BACKUP=$DIR_DESTINO"bkp-$PROJETO$1$DATA_HORA"
 
-	sincroniza $DIR_TMP_SYNC$1 $CAMINHO_DESTINO$PROJETO$1 $2
+	sincroniza "$DIR_TMP_SYNC$1" "$CAMINHO_DESTINO$PROJETO$1" $2
 }
 
 exibeResultado() {
@@ -200,6 +224,14 @@ exibeResultado() {
 		0 0
 	fi
 	clear
+}
+
+verificaArquivo() {
+	# Verifica a existencia do programa $1
+	if [ ! -e "$1" ]; then
+		echo "ATENCAO! O arquivo '$1' nao foi encontrado. Operacao cancelada."
+		exit
+	fi
 }
 
 principal $1

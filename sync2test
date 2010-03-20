@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 03/09/2009 - Luiz Sanches
-# Versao 0.16
+# 09/10/2009 - Luiz Sanches
+# Versao 0.17
 
 principal() {
 	# Definicao de variaveis do programa
@@ -134,10 +134,12 @@ principal() {
 				echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
 				echo "/controller/ d" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/model/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/dao/ d" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/model/database/ d" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/model/generic/ d" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/model/template/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/model/utils/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/vo/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/view/ d" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/view/css/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
 				echo "/view/images/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
@@ -160,14 +162,6 @@ principal() {
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
 
-			# Seleciona arquivos que nao serao sincronizados
-			ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
-			if [ -e "$ARQUIVO_PROJETO_EXCLUDE" ]; then
-				EXCLUDE="--exclude-from=$ARQUIVO_PROJETO_EXCLUDE"
-			else
-				EXCLUDE=""
-			fi
-
 			# se escolher a opcao 'Outros'
 			if [ "$MODULO" = "Outros" ]; then
 				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
@@ -189,7 +183,7 @@ principal() {
 					eval $DIALOG --yesno \"Confirma a operacao?\" 0 0
 				
 					# Se escolher nao, retorna a tela de opcoes
-					[ $? != 0 ] && continue
+					[ $? -ne 0 ] && continue
 
 					if [ "$OPCAO" = "Demais" ]; then
 						# Executa a funcao para baixar o projeto do SVN
@@ -216,17 +210,12 @@ principal() {
 
 						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
 
-						sincroniza $PROJETO_COMPLETO r $EXCLUDE
+						sincroniza $PROJETO_COMPLETO r
 
 						exibeResultado
 					fi
 				done
 			else # Para a escolha de um modulo
-				eval $DIALOG --yesno \"Confirma a operacao?\" 0 0
-			
-				# Se escolher nao, retorna a tela de opcoes
-				[ $? != 0 ] && continue
-
 				# Adiciona um nivel de diretorio na variavel modulo
 				ARVORE="/view/"
 				FACADE="$MODULO"
@@ -247,10 +236,10 @@ principal() {
 				# Sincroniza o projeto criando um backup
 				# Se o diretorio do projeto nao existir, sincroniza tudo
 				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
-					sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
+					sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO a
 				# Se existir, sincroniza somente os diretorios do modulo selecionado
 				else
-					sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" r $EXCLUDE
+					sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" r "SIMULA"
 
 					# Sincroniza as fachadas do modulo
 					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
@@ -259,7 +248,7 @@ principal() {
 					ARQUIVO_EXCLUDE_MODULOS="$DIR_CONF_USER/.modulos"
 					EXCLUDE_FACADE="$DIR_CONF_USER/.exclude_facade"
 
-					[ -e "$ARQUIVO_EXCLUDE_MODULOS" ] rm "$ARQUIVO_EXCLUDE_MODULOS"
+					[ -e "$ARQUIVO_EXCLUDE_MODULOS" ] && rm "$ARQUIVO_EXCLUDE_MODULOS"
 
 					while read LINHA
 					do
@@ -297,16 +286,60 @@ sincroniza() {
 	#echo $3 = r (recursive), a (archive), d (directory)
 	#echo $4 = qualquer parametro do rsync
 
-	# Sincroniza o projeto
-	rsync -CvzpOu$3 $4 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
-		
-	# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
-	cp $ARQUIVO_LOG "$ARQUIVO_LOG.old"
-	sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "$ARQUIVO_LOG.old" > $ARQUIVO_LOG
-	rm "$ARQUIVO_LOG.old"
+	# Seleciona arquivos que nao serao sincronizados
+	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
+	LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
+	LISTA_TMP="$DIR_CONF_USER/.lista"
 
-	# Atualiza o arquivo de log permanente
-	cat $ARQUIVO_LOG >> $ARQUIVO_LOG_PERMANENTE
+	# Cria a lista de arquivos que nao seram sincronizados
+	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
+
+	[ -e "$ARQUIVO_PROJETO_EXCLUDE" ] && cat $ARQUIVO_PROJETO_EXCLUDE > $LISTA_EXCLUDE
+
+	if [ "$4" = "SIMULA" ]; then
+		# Simula (-n) a sincronizacao guardando em arquivo
+		rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+
+		# Apaga as demais linhas, deixando somente os nomes dos arquivos
+		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+		sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
+		rm "${LISTA_TMP}1" 
+
+		# Mostra os arquivos e opcao para selecionar os que nao seram sincronizados
+		ARQ_EXCLUDES=$(cat $LISTA_TMP)
+
+		if [ -n "$ARQ_EXCLUDES" ]; then
+			NAO_SINC=$(eval $DIALOG --stdout --separate-output --checklist \"Selecione os arquivos que nao seram sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+
+			# Se nao cancelou
+			if [ $? -eq 0 ]; then
+				# Adiciona na lista os arquivos que nao seram sincronizados
+				echo "$NAO_SINC" | while read LINHA
+				do
+					echo "$LINHA" >> $LISTA_EXCLUDE
+				done
+
+				# Sincroniza o projeto sem os arquivos selecionados anteriormente
+				rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+			fi
+		else
+			# Sincroniza o projeto prevendo delecao de arquivos
+			rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+		fi
+	else
+		# Sincroniza o projeto sem perguntar nada
+		rsync -CvzpOu$3 $4 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+	fi
+
+	if [ -e $ARQUIVO_LOG ]; then
+		# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
+		cp $ARQUIVO_LOG "$ARQUIVO_LOG.old"
+		sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "$ARQUIVO_LOG.old" > $ARQUIVO_LOG
+		rm "$ARQUIVO_LOG.old"
+
+		# Atualiza o arquivo de log permanente
+		cat $ARQUIVO_LOG >> $ARQUIVO_LOG_PERMANENTE
+	fi
 }
 
 sincronizaDiretorio() {

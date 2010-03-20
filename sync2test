@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 24/11/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.23
+# 01/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.00
 
 principal() {
 	# Definicao de variaveis do programa
@@ -370,7 +370,7 @@ sincroniza() {
 					# Sincroniza o projeto sem os arquivos selecionados anteriormente
 
 					if [ "$6" = "SSH" ]; then # Via SSH
-						rsync -CvzpOu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+						rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 
 					else # No mesmo servidor
 						rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2

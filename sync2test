@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 29/09/2009 - Luiz Sanches
-# Versao 0.13
+# 01/10/2009 - Luiz Sanches
+# Versao 0.14
 
 principal() {
 	# Definicao de variaveis do programa
@@ -21,9 +21,6 @@ principal() {
 
 	ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log" 
 	ARQUIVO_LOG_PERMANENTE="$DIR_CONF_USER/$SCRIPT.log"
-
-	##PERMISSOES="Do+w,Fugo+rw,Fugo-x"
-	PERMISSOES="Fugo+rw,Fugo-x"
 
 	# Criacao dos diretorios de configuracao do programa
 	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
@@ -46,7 +43,7 @@ principal() {
 	verificaArquivo "/bin/sed"
 
 	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste. ${VERSAO_SCRIPT:2}' "
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza SVN com Servidor de Teste. ${VERSAO_SCRIPT:2} - Usuario: $USER '"
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
@@ -280,12 +277,9 @@ sincroniza() {
 	NIVEL1_DIR_BACKUP=$(echo $DIR_BACKUP | cut -d"/" -f4)
 	NIVEL1_DIR_BACKUP="${DIR_DESTINO}${NIVEL1_DIR_BACKUP}"
 
-	[ ! -e "$NIVEL1_DIR_BACKUP" ] && mkdir -p "$NIVEL1_DIR_BACKUP"
-	chmod 777 -R $NIVEL1_DIR_BACKUP 2> /dev/null
-
 	# Sincroniza o projeto criando um backup
 	##rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG $1 $2
-	rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
+	rsync -CvzpOu$3 $4 --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
 		
 	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
 	cp $ARQUIVO_LOG $ARQUIVO_LOG.old

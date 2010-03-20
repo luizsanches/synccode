@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 23/10/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 0.21
+# 23/11/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 0.22
 
 principal() {
 	# Definicao de variaveis do programa
@@ -81,12 +81,14 @@ principal() {
 			DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
 			USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
 			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
+			PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
 
 			echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
 			echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
 			echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
 			echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
 			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
+			echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
 		fi
 
 		# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
@@ -167,7 +169,7 @@ principal() {
 				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
 
 				if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas comuns a todos os modulos do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}" 
+					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas comuns a todos os modulos do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}"
 				fi
 
 				while : ; do
@@ -190,26 +192,46 @@ principal() {
 						done < $ARQUIVO_PROJETO_DEMAIS
 
 						exibeResultado
-					# Outros diretorios
+					# Outros diretorios (completo)
 					else
 						DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
 
 						DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
 
-						# formata os caminhos de origem e destino, exemplo:
-						# antes.: siig:siig_homologacao
-						# depois: /var/www/siig/ /var/www/siig_homologacao/
-						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
-
-						PROJETO_COMPLETO_SELECIONADO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
-
 						DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 
-						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 
-						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO_COMPLETO_SELECIONADO}_${USER}.log"
+						PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
 
-						sincroniza $PROJETO_COMPLETO r "SIMULA"
+						# Se o 5o parametro for "SSH" entao sincronizar via ssh
+						if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
+							# formata os caminhos do servidor e diretorio de destino via SSH
+							# antes: siig_homologacao:192.168.200.12@/var/www/#siig
+							# depois: /var/www/siig_homologacao/ 192.168.200.12:/var/www/siig/
+
+							PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
+
+							PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
+
+							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA_HORA"
+
+							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
+
+							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO" "SSH"
+
+						# Senao sincroniza no mesmo servidor
+						else
+							# formata os caminhos de origem e destino, exemplo:
+							# antes.: siig:siig_homologacao
+							# depois: /var/www/siig/ /var/www/siig_homologacao/
+
+							DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+
+							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+
+							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO"
+						fi
 
 						exibeResultado
 					fi
@@ -235,10 +257,10 @@ principal() {
 				# Sincroniza o projeto criando um backup
 				# Se o diretorio do projeto nao existir, sincroniza tudo
 				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
-					sincroniza $DIR_TMP_SYNC $DIR_DESTINO a
+					sincroniza $DIR_TMP_SYNC $DIR_DESTINO a "naosimula" "$FACADE"
 				# Se existir, sincroniza somente os diretorios do modulo selecionado
 				else
-					sincroniza "$DIR_TMP_SYNC$MODULO" "$DIR_DESTINO$PROJETO$ARVORE" r "SIMULA"
+					sincroniza "$DIR_TMP_SYNC$MODULO" "$DIR_DESTINO$PROJETO$ARVORE" r "SIMULA" "$FACADE"
 
 					# Sincroniza as fachadas do modulo
 					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
@@ -284,6 +306,8 @@ sincroniza() {
 	#echo $2 = destino
 	#echo $3 = r (recursive), a (archive), d (directory)
 	#echo $4 = qualquer parametro do rsync
+	#echo $5 = titulo da janela (nome do modulo/servidor)
+	#echo $6 = modo de comunicacao "SSH" ou vazio
 
 	# Seleciona arquivos que nao serao sincronizados
 	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
@@ -300,7 +324,11 @@ sincroniza() {
 
 	if [ "$4" = "SIMULA" ]; then
 		# Simula (-n) a sincronizacao guardando em arquivo
-		rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+		if [ "$6" = "SSH" ]; then
+			rsync -CvzpOu$3 -n -e "ssh -l ${USER} -p ${PORTA_SSH}" --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+		else
+			rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+		fi
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
 		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
@@ -317,8 +345,9 @@ sincroniza() {
 
 		[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
 
+		# Se nao for nula, exibira a caixa com os arquivos para selecao
 		if [ -n "$ARQ_EXCLUDES" ]; then
-			LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"Selecao de arquivos\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+			LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"[ $5 ]\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
 
 			# Se nao cancelou
 			if [ $? -eq 0 ]; then
@@ -337,7 +366,13 @@ sincroniza() {
 					done
 
 					# Sincroniza o projeto sem os arquivos selecionados anteriormente
-					rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+
+					if [ "$6" = "SSH" ]; then # Via SSH
+						rsync -CvzpOu$3 -e "ssh -l ${USER} -p ${PORTA_SSH}" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+
+					else # No mesmo servidor
+						rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+					fi
 				fi
 			fi
 		else
@@ -364,7 +399,7 @@ sincronizaDiretorio() {
 	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
 
-	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA"
+	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA" "Demais"
 }
 
 exibeResultado() {

@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 21/12/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.03
+# 04/02/2009 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.04
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -366,6 +366,10 @@ sincroniza() {
 						# Sincroniza o projeto sem os arquivos selecionados anteriormente
 
 						if [ "$6" = "SSH" ]; then # Via SSH
+							SERVIDOR_PRODUCAO=$(echo $2 | cut -d: -f1)
+
+							ssh -p $PORTA_SSH $SERVIDOR_PRODUCAO "umask 002 ; mkdir -p $DIR_BACKUP"
+
 							rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 
 						else # No mesmo servidor

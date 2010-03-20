@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 04/02/2009 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.04
+# 05/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.05
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -321,7 +321,7 @@ sincroniza() {
 		fi
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
-		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
 
 		# Adiciona os arquivos na lista de arquivos para nao sincronizar
 		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE

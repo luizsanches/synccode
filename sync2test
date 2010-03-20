@@ -1,8 +1,8 @@
 #!/bin/bash
 # sync2test
 # Programa de sincronizacao de codigo-fonte com o servidor de teste
-# 02/10/2009 - Luiz Sanches
-# Versao 0.15
+# 03/09/2009 - Luiz Sanches
+# Versao 0.16
 
 principal() {
 	# Definicao de variaveis do programa
@@ -53,208 +53,232 @@ principal() {
 	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
 	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed 's/:/ "/;s/$/"/')
 
-	# Selecao de projeto
-	PROJETO=$(eval "$DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS")
+	while : ; do	
+		# Selecao de projeto
+		PROJETO=$(eval "$DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS")
 
-	# se o projeto for nulo, emitir mensagem e sair
-	if [ -z "$PROJETO" ]; then
-		eval "$DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum projeto foi selecionado. Operacao cancelada.\" 0 0"
-		exit
-	fi
-	# Fim secao dos projetos
+		# Se cancelar, sai do programa
+		[ $? -ne 0 ] && break
 
-	# Verifica a existencia dos arquivos de modulos das gerencias
-	if [ "$PROJETO" = "siig" ]; then
-		ARQUIVO_MODULOS_GPI="$DIR_CONF/${PROJETO}_gpi_modulos"
-		ARQUIVO_MODULOS_GPA="$DIR_CONF/${PROJETO}_gpa_modulos"
+		# Verifica a existencia do arquivo de modulos das gerencias
+		if [ "$PROJETO" = "siig" ]; then
+			ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
-		if [ ! -e "$ARQUIVO_MODULOS_GPI" ]; then
-			echo "Afr:Administracao de Frota" > $ARQUIVO_MODULOS_GPI
-			echo "Sco:Controle de Obras" >> $ARQUIVO_MODULOS_GPI
-			echo "Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS_GPI
+			if [ ! -e "$ARQUIVO_MODULOS" ]; then
+				echo "gpi:Afr:Administracao de Frota" > $ARQUIVO_MODULOS_GPI
+				echo "gpi:Sco:Controle de Obras" >> $ARQUIVO_MODULOS_GPI
+				echo "gpi:Gestao:Sala de Gestao" >> $ARQUIVO_MODULOS_GPI
+				echo "gpa:Seg:Seguranca" > $ARQUIVO_MODULOS_GPA
+				echo "gpa:Cpr:Controle de Processos" >> $ARQUIVO_MODULOS_GPA
+				echo "gpa:Aof:Administracao Financeira" >> $ARQUIVO_MODULOS_GPA
+				echo "gpa:Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS_GPA
+			fi
 		fi
 
-		if [ ! -e "$ARQUIVO_MODULOS_GPA" ]; then
-			echo "Seg:Seguranca" > $ARQUIVO_MODULOS_GPA
-			echo "Cpr:Controle de Processos" >> $ARQUIVO_MODULOS_GPA
-			echo "Aof:Administracao Financeira" >> $ARQUIVO_MODULOS_GPA
-			echo "Talentos:Banco de Talentos" >> $ARQUIVO_MODULOS_GPA
-		fi
-	fi
+		# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
+		if [ -e "$ARQUIVO_CONF" ]; then
+			. $ARQUIVO_CONF
+		else
+			SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"192.168.200.12\")
+			DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/desenvolvimento/\")
+			DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
 
-	# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
-	if [ -e "$ARQUIVO_CONF" ]; then
-		. $ARQUIVO_CONF
-	else
-		SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"192.168.200.12\")
-		DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/desenvolvimento/\")
-		DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
-
-		echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
-		echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
-		echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
-	fi
-
-	# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
-	if [ -e "$ARQUIVO_CONF_USER" ]; then
-		. $ARQUIVO_CONF_USER
-	else
-		USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
-		SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
-
-		# Selecao de gerencia
-		GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
-
-		# Converte o conteudo da variavel gerencia para minusculo
-		GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
-
-		# se a gerencia for nula, emitir mensagem e sair
-		if [ -z "$GERENCIA" ]; then
-			eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada. Operacao cancelada.\" 0 0
-			exit
-		fi
-		# Fim secao de gerencia
-
-		echo "USUARIO=\"$USUARIO\"" >> $ARQUIVO_CONF_USER
-		echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF_USER
-		echo "GERENCIA=\"$GERENCIA\"" >> $ARQUIVO_CONF_USER
-	fi
-
-	CAMINHO_DESTINO="$DIR_DESTINO"
-
-	# prepara o diretorio de sincronizacao
-	DIR_TMP_SYNC="$DIR_CONF_USER/tmp/$PROJETO"
-
-	# deleta o arquivo de log para mostrar somente a ultima sincronizacao
-	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
-
-	# seleciona os modulos do projeto, no arquivo $PROJETO_$GERENCIA_modulos, com o padrao modulo:descricao
-	ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_${GERENCIA}_modulos"
-	
-	verificaArquivo "$ARQUIVO_MODULOS"
-
-	MODULOS_PROJETO=$(sed '-n' 'p' $ARQUIVO_MODULOS | sed 's/:/ "/;s/$/"/')
-
-	ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
-
-	ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
-
-	if [ "$PROJETO" = "siig" ]; then
-		if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-			echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
-			echo "/controller/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/model/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/model/database/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/model/generic/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/model/template/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/model/utils/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/view/ d" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/view/css/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/view/images/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/view/js/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-			echo "/view/style/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
-		fi
-	fi
-
-	if [ -e "$ARQUIVO_PROJETO_DEMAIS" ] || [ -e "$ARQUIVO_PROJETO_COMPLETO" ]; then
-		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
-	fi
-
-	# Selecao de modulo
-	MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto $PROJETO a ser atualizado para o servidor de teste:\" 0 0 0 $MODULOS_PROJETO)
-
-	# se o modulo for nulo, emitir mensagem e sair
-	if [ -z "$MODULO" ]; then
-		eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhum modulo foi selecionado. Operacao cancelada.\" 0 0
-		exit
-	fi
-
-	# se escolher a opcao 'Outros'
-	if [ "$MODULO" = "Outros" ]; then
-		LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
-
-		if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-			LISTA_OUTRAS_OPCOES="Demais \"Demais pastas do projeto $PROJETO\" ${LISTA_OUTRAS_OPCOES}" 
+			echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF
+			echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
+			echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
 		fi
 
-		# Selecao de outras opcoes
-		OPCAO=$(eval $DIALOG --stdout --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
+		# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
+		if [ -e "$ARQUIVO_CONF_USER" ]; then
+			. $ARQUIVO_CONF_USER
+		else
+			USUARIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
+			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do SVN:\" 0 0 \"desenv123\")
 
-		# se a opcao for nula, emitir mensagem e sair
-		if [ -z "$OPCAO" ]; then
-			eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma opcao foi selecionada. Operacao cancelada.\" 0 0
-			exit
+			# Selecao de gerencia
+			GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 GPI \"Projetos_Institucionais\" GPA \"Projetos_Academicos\")
+
+			# Converte o conteudo da variavel gerencia para minusculo
+			GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
+
+			# se a gerencia for nula, emitir mensagem e retornar a tela de projetos
+			if [ -z "$GERENCIA" ]; then
+				eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada.\" 0 0
+				continue
+			fi
+			# Fim secao de gerencia
+
+			echo "USUARIO=\"$USUARIO\"" >> $ARQUIVO_CONF_USER
+			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF_USER
+			echo "GERENCIA=\"$GERENCIA\"" >> $ARQUIVO_CONF_USER
 		fi
 
-		eval $DIALOG --yesno \"Deseja realizar a operacao?\" 0 0
-	
-		if [ $? = 0 ]; then # Se escolher sim
-			if [ "$OPCAO" = "Demais" ]; then
-				# Executa a funcao para baixar o projeto do SVN
-				baixaProjetoSvn
+		CAMINHO_DESTINO="$DIR_DESTINO"
 
-				while read LINHA
-				do
-					sincronizaDiretorio $LINHA
-				done < $ARQUIVO_PROJETO_DEMAIS
+		# prepara o diretorio de sincronizacao
+		DIR_TMP_SYNC="$DIR_CONF_USER/tmp/$PROJETO"
 
-				exibeResultado
-			# Outros diretorios
+		# seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao gerencia:modulo:descricao
+		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
+		
+		verificaArquivo "$ARQUIVO_MODULOS"
+
+		MODULOS_PROJETO=$(sed "/$GERENCIA/!d" $ARQUIVO_MODULOS | cut -d: -f2,3 | sed 's/:/ "/;s/$/"/')
+
+		ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
+
+		ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
+
+		if [ "$PROJETO" = "siig" ]; then
+			if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+				echo "/config/ d" > $ARQUIVO_PROJETO_DEMAIS
+				echo "/controller/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/database/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/generic/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/template/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/model/utils/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/view/ d" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/view/css/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/view/images/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/view/js/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+				echo "/view/style/ dr" >> $ARQUIVO_PROJETO_DEMAIS 
+			fi
+		fi
+
+		if [ -e "$ARQUIVO_PROJETO_DEMAIS" ] || [ -e "$ARQUIVO_PROJETO_COMPLETO" ]; then
+			MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
+		fi
+
+		while : ; do
+			# deleta o arquivo de log para mostrar somente a ultima sincronizacao
+			[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+
+			# Selecao de modulo
+			MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste:\" 0 0 0 $MODULOS_PROJETO)
+
+			# Se cancelou retorna a tela de projetos
+			[ $? -ne 0 ] && break
+
+			# Seleciona arquivos que nao serao sincronizados
+			ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
+			if [ -e "$ARQUIVO_PROJETO_EXCLUDE" ]; then
+				EXCLUDE="--exclude-from=$ARQUIVO_PROJETO_EXCLUDE"
 			else
-				DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
+				EXCLUDE=""
+			fi
 
-				DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+			# se escolher a opcao 'Outros'
+			if [ "$MODULO" = "Outros" ]; then
+				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
 
-				# formata os caminhos de origem e destino, exemplo:
-				# antes.: siig:siig_homologacao
-				# depois: /var/www/siig/ /var/www/siig_homologacao/
-				PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+				if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}" 
+				fi
+
+				while : ; do
+					# deleta o arquivo de log para mostrar somente a ultima sincronizacao
+					[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+
+					# Selecao de outras opcoes
+					OPCAO=$(eval $DIALOG --stdout --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
+
+					# Se cancelar retorna a tela de modulos
+					[ $? -ne 0 ] && break
+
+					eval $DIALOG --yesno \"Confirma a operacao?\" 0 0
+				
+					# Se escolher nao, retorna a tela de opcoes
+					[ $? != 0 ] && continue
+
+					if [ "$OPCAO" = "Demais" ]; then
+						# Executa a funcao para baixar o projeto do SVN
+						baixaProjetoSvn
+
+						while read LINHA
+						do
+							sincronizaDiretorio $LINHA
+						done < $ARQUIVO_PROJETO_DEMAIS
+
+						exibeResultado
+					# Outros diretorios
+					else
+						DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
+
+						DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+
+						# formata os caminhos de origem e destino, exemplo:
+						# antes.: siig:siig_homologacao
+						# depois: /var/www/siig/ /var/www/siig_homologacao/
+						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+
+						DATA_HORA=$(date +%Y-%m-%d-%H-%M)
+
+						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+
+						sincroniza $PROJETO_COMPLETO r $EXCLUDE
+
+						exibeResultado
+					fi
+				done
+			else # Para a escolha de um modulo
+				eval $DIALOG --yesno \"Confirma a operacao?\" 0 0
+			
+				# Se escolher nao, retorna a tela de opcoes
+				[ $? != 0 ] && continue
+
+				# Adiciona um nivel de diretorio na variavel modulo
+				ARVORE="/view/"
+				FACADE="$MODULO"
+
+				# Converte o conteudo da variavel modulo para minusculo
+				MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
 
 				DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 
-				DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA_HORA"
+				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
 
-				sincroniza $PROJETO_COMPLETO r
+				# Une view/nome do modulo
+				MODULO="$ARVORE$MODULO"
+
+				# Executa a funcao para baixar o projeto do SVN
+				baixaProjetoSvn
+
+				# Sincroniza o projeto criando um backup
+				# Se o diretorio do projeto nao existir, sincroniza tudo
+				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
+					sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
+				# Se existir, sincroniza somente os diretorios do modulo selecionado
+				else
+					sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" r $EXCLUDE
+
+					# Sincroniza as fachadas do modulo
+					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
+
+					# Prepara o arquivo para nao sincronizar as outras fachadas
+					ARQUIVO_EXCLUDE_MODULOS="$DIR_CONF_USER/.modulos"
+					EXCLUDE_FACADE="$DIR_CONF_USER/.exclude_facade"
+
+					[ -e "$ARQUIVO_EXCLUDE_MODULOS" ] rm "$ARQUIVO_EXCLUDE_MODULOS"
+
+					while read LINHA
+					do
+						MOD=$(echo $LINHA | cut -d: -f2)
+						echo "$MOD*" >> $ARQUIVO_EXCLUDE_MODULOS
+					done < $ARQUIVO_MODULOS
+
+					sed "/^$FACADE/d" $ARQUIVO_EXCLUDE_MODULOS > $EXCLUDE_FACADE
+
+					sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --exclude-from=$EXCLUDE_FACADE
+				fi
 
 				exibeResultado
 			fi
-		fi
-	else # Para a escolha de um modulo
-		# Adiciona um nivel de diretorio na variavel modulo
-		ARVORE="/view/"
-		FACADE="$MODULO"
+		done
+	done
 
-		# Converte o conteudo da variavel modulo para minusculo
-		MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
-
-		DATA_HORA=$(date +%Y-%m-%d-%H-%M)
-
-		DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$ARVORE$MODULO/$DATA_HORA"
-
-		# Une view/nome do modulo
-		MODULO="$ARVORE$MODULO"
-
-		# Executa a funcao para baixar o projeto do SVN
-		baixaProjetoSvn
-
-		# Sincroniza o projeto criando um backup
-		DIR_EXISTE=$(ls $DIR_DESTINO$PROJETO/index.php)
-
-		if [ -z "$DIR_EXISTE" ]; then
-			sincroniza $DIR_TMP_SYNC $CAMINHO_DESTINO ra
-		else
-			sincroniza "$DIR_TMP_SYNC$MODULO" "$CAMINHO_DESTINO$PROJETO$ARVORE" ra --exclude='sco/arquivos/'
-		fi
-
-		# Sincroniza as fachadas do modulo
-		DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/model/facade/$DATA_HORA"
-		cd "$DIR_TMP_SYNC/model/facade/"
-		sincroniza "$FACADE*.php" "$CAMINHO_DESTINO$PROJETO/model/facade/" r
-		cd $DIR_SCRIPT
-		#sincroniza "$DIR_TMP_SYNC/model/facade/" "$CAMINHO_DESTINO$PROJETO/model/facade/" r --include="+ $DIR_TMP_SYNC/model/facade/$FACADE*.php" 
-
-		exibeResultado
-	fi
+	clear
+	exit
 }
 
 baixaProjetoSvn() {
@@ -273,18 +297,13 @@ sincroniza() {
 	#echo $3 = r (recursive), a (archive), d (directory)
 	#echo $4 = qualquer parametro do rsync
 
-	# Cria o diretorio de backup com permissoes para outros usuarios gravarem nele
-	NIVEL1_DIR_BACKUP=$(echo $DIR_BACKUP | cut -d"/" -f4)
-	NIVEL1_DIR_BACKUP="${DIR_DESTINO}${NIVEL1_DIR_BACKUP}"
-
-	# Sincroniza o projeto criando um backup
-	##rsync -CvzpOu$3 $4 --chmod=$PERMISSOES -h -b --backup-dir=$DIR_BACKUP --delete --log-file=$ARQUIVO_LOG $1 $2
-	rsync -CvzpOu$3 $4 --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
+	# Sincroniza o projeto
+	rsync -CvzpOu$3 $4 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG $1 $2
 		
-	# Apaga as 2 primeiras e 2 ultimas linhas do log que nao mostram o nome do arquivo
-	cp $ARQUIVO_LOG $ARQUIVO_LOG.old
-	sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" $ARQUIVO_LOG.old > $ARQUIVO_LOG
-	rm $ARQUIVO_LOG.old
+	# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
+	cp $ARQUIVO_LOG "$ARQUIVO_LOG.old"
+	sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "$ARQUIVO_LOG.old" > $ARQUIVO_LOG
+	rm "$ARQUIVO_LOG.old"
 
 	# Atualiza o arquivo de log permanente
 	cat $ARQUIVO_LOG >> $ARQUIVO_LOG_PERMANENTE
@@ -296,7 +315,7 @@ sincronizaDiretorio() {
 	DATA_HORA=$(date +%Y-%m-%d-%H-%M)
 	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO$1$DATA_HORA"
 
-	sincroniza "$DIR_TMP_SYNC$1" "$CAMINHO_DESTINO$PROJETO$1" $2
+	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$CAMINHO_DESTINO$PROJETO$1" $2
 }
 
 exibeResultado() {
@@ -307,7 +326,6 @@ exibeResultado() {
 	else
 		eval $DIALOG --title \"$SCRIPT - log da atualizacao\" --textbox $ARQUIVO_LOG 0 0
 	fi
-	clear
 }
 
 verificaArquivo() {

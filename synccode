@@ -1,15 +1,15 @@
 #!/bin/bash
-# sync2test
+# synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 05/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.05
+# 20/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.06
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
 	umask 002
 
 	# Definicao de variaveis do programa
-	SCRIPT="sync2test"
+	SCRIPT="synccode"
 	VERSAO_SCRIPT=$(sed '/Versao/!d; q' $0)
 
 	DIR_SCRIPT=$(pwd)

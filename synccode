@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 20/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.06
+# 23/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.07
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -56,18 +56,16 @@ principal() {
 
 	while : ; do	
 		# Selecao de projeto
-		PROJETO=$(eval $DIALOG --stdout --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
+		PROJETO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
 
 		# Se cancelar, sai do programa
 		[ $? -ne 0 ] && break
 
 		# Verifica a existencia do arquivo de modulos das gerencias
-		if [ "$PROJETO" = "siig" ]; then
-			ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
+		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
-			if [ ! -e "$ARQUIVO_MODULOS" ]; then
-				echo "gerencia:Modulo:Descricao do modulo" > $ARQUIVO_MODULOS
-			fi
+		if [ ! -e "$ARQUIVO_MODULOS" ]; then
+			echo "gerencia:Modulo:Descricao do modulo" > $ARQUIVO_MODULOS
 		fi
 
 		# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
@@ -102,7 +100,7 @@ principal() {
 			LISTA_GERENCIAS=$(sed '-n' 'p' $ARQUIVO_GERENCIAS | sed "s/:/ '/;s/$/'/")
 
 			# Selecao de gerencia
-			GERENCIA=$(eval $DIALOG --stdout --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 $LISTA_GERENCIAS)
+			GERENCIA=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 $LISTA_GERENCIAS)
 
 			# Converte o conteudo da variavel gerencia para minusculo
 			GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
@@ -137,10 +135,8 @@ principal() {
 
 		ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
 
-		if [ "$PROJETO" = "siig" ]; then
-			if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-				echo "/diretorio/ dr" > $ARQUIVO_PROJETO_DEMAIS
-			fi
+		if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
+			echo "/diretorio/ dr" > $ARQUIVO_PROJETO_DEMAIS
 		fi
 
 		if [ -e "$ARQUIVO_PROJETO_DEMAIS" ] || [ -e "$ARQUIVO_PROJETO_COMPLETO" ]; then
@@ -152,7 +148,7 @@ principal() {
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 			# Selecao de modulo
-			MODULO=$(eval $DIALOG --stdout --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste na pasta [$PROJETO]:\" 0 0 0 $MODULOS_PROJETO)
+			MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste na pasta [$PROJETO]:\" 0 0 0 $MODULOS_PROJETO)
 
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
@@ -233,20 +229,12 @@ principal() {
 					fi
 				done
 			else # Para a escolha de um modulo
-				# Adiciona um nivel de diretorio na variavel modulo
-				ARVORE="/view/"
-				FACADE="$MODULO"
-
-				# Converte o conteudo da variavel modulo para minusculo
-				MODULO=$(echo $MODULO | tr [:upper:] [:lower:])
+				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
 
 				DATA=$(date +%Y-%m-%d)
 				HORA=$(date +%H-%M)
 
-				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA$ARVORE"
-
-				# Une view/nome do modulo
-				MODULO="$ARVORE$MODULO"
+				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA"
 
 				# Executa a funcao para baixar o projeto do SVN
 				baixaProjetoSvn
@@ -254,15 +242,10 @@ principal() {
 				# Sincroniza o projeto criando um backup
 				# Se o diretorio do projeto nao existir, sincroniza tudo
 				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
-					sincroniza $DIR_TMP_SYNC $DIR_DESTINO a "naosimula" "$FACADE"
+					sincroniza "$DIR_TMP_SYNC" "$DIR_DESTINO" a "naosimula" "$MODULO"
 				# Se existir, sincroniza somente os diretorios do modulo selecionado
 				else
-					sincroniza "$DIR_TMP_SYNC$MODULO" "$DIR_DESTINO$PROJETO$ARVORE" r "SIMULA" "$FACADE"
-
-					# Sincroniza as fachadas do modulo
-					DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA/model/facade"
-
-					sincroniza "$DIR_TMP_SYNC/model/facade/" "$DIR_DESTINO$PROJETO/model/facade/" r "SIMULA" "Facades"
+					sincroniza "$DIR_TMP_SYNC" "$DIR_DESTINO" r "SIMULA" "Modulo: $TITULO_MODULO" "LOCAL" "$GERENCIA:$MODULO"
 				fi
 
 				exibeResultado
@@ -291,6 +274,7 @@ sincroniza() {
 	#echo $4 = qualquer parametro do rsync
 	#echo $5 = titulo da janela (nome do modulo/servidor)
 	#echo $6 = modo de comunicacao SSH ou vazio
+	#echo $7 = modulo:gerencia
 
 	# Seleciona arquivos que nao serao sincronizados
 	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
@@ -337,6 +321,22 @@ sincroniza() {
 			# Adiciona os campos para preparar para a caixa de checkbox do dialog
 			sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
 			rm "${LISTA_TMP}1" 
+
+			# Filtra somente os arquivos do modulo selecionado
+			if [ -n "$7" ]; then
+				[ -e "${LISTA_TMP}0" ] && rm "${LISTA_TMP}0"
+
+				FILTROS_MODULO=$(sed "/$7/!d" $ARQUIVO_MODULOS | cut -d: -f4 | sed 's/|/\n/g')
+
+				# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
+				echo "$FILTROS_MODULO" | while read LINHA
+				do
+					TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
+					sed "/$TEMP/ !d" "${LISTA_TMP}" >> "${LISTA_TMP}0"
+				done
+
+				mv "${LISTA_TMP}0" "$LISTA_TMP"
+			fi
 
 			# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
 			ARQ_EXCLUDES=$(cat $LISTA_TMP)

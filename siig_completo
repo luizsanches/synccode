@@ -1,2 +1,3 @@
-Homologacao:siig -> siig_homologacao:siig:siig_homologacao
+Teste:siig -> siig_teste:siig:siig_teste
+Homologacao:siig_teste -> siig_homologacao:siig_teste:siig_homologacao
 PRODUCAO:siig_homologacao -> siig (PRODUCAO):siig_homologacao:192.168.200.12@/home/luizsanches/#siig_producao:SSH

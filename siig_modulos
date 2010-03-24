@@ -1,8 +1,12 @@
-gpi:Afr:Administracao de Frota
-gpi:Sco:Controle de Obras
-gpi:Gestao:Sala de Gestao
-gpi:Sgc:Controle de Compras
-gpa:Seg:Seguranca
-gpa:Cpr:Controle de Processos
-gpa:Aof:Administracao Financeira
-gpa:Talentos:Banco de Talentos
+gpi:Afr:Administracao de Frota:facade/Afr|view/afr
+gpi:Sco:Controle de Obras:facade/Sco|view/sco
+gpi:Gestao:Sala de Gestao:view/gestao
+gpi:Aes:Controle de Estoque:facade/Aes|view/aes
+gpi:Cvi:Controle de Viagens:facade/Cvi|view/cvi
+gpa:Seg:Seguranca:dao/Seg;facade/Seg|vo/Seg|view/seg
+gpa:Cpr:Controle de Processos:dao/Cpr|facade/Cpr|vo/Cpr|view/cpr
+gpa:Aof:Administracao Financeira:facade/Aof|view/aof
+gpa:Ddv:Direitos e Deveres:dao/Ddv|facade/Ddv|vo/Ddv|view/ddv
+gpa:Talentos:Banco de Talentos:facade/Talentos|view/talentos
+gpa:Pap:Plano de Trabalho Anual:zf-siig/application/modules/pap|zf-siig/public/js/modulos/pap
+gpa:Cae:Alimentacao Escolar:zf-siig/application/modules/cae|zf-siig/public/js/modulos/cae

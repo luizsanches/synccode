@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 23/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.07
+# 24/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.08
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -11,6 +11,8 @@ principal() {
 	# Definicao de variaveis do programa
 	SCRIPT="synccode"
 	VERSAO_SCRIPT=$(sed '/Versao/!d; q' $0)
+	IP_COMPUTADOR=$(/sbin/ifconfig | grep 'inet end.:' | cut -d: -f2 | cut -d' ' -f2 | sed '/127.0.0.1/ d')
+	NOME_COMPUTADOR=$(uname -n)
 
 	DIR_SCRIPT=$(pwd)
 
@@ -44,7 +46,7 @@ principal() {
 	verificaArquivo "/bin/sed"
 
 	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza arquivos SVN com servidores de teste e producao. ${VERSAO_SCRIPT:2} - Usuario: $USER '"
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza codigo-fonte de repositorios SVN entre servidores. ${VERSAO_SCRIPT:2} - Usuario: $USER - Computador: $NOME_COMPUTADOR ($IP_COMPUTADOR)'"
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
@@ -195,8 +197,8 @@ principal() {
 						# Se o 5o parametro for "SSH" entao sincronizar via ssh
 						if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
 							# formata os caminhos do servidor e diretorio de destino via SSH
-							# antes: siig_homologacao:192.168.200.12@/var/www/#siig
-							# depois: /var/www/siig_homologacao/ 192.168.200.12:/var/www/siig/
+							# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
+							# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
 
 							PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
 
@@ -213,8 +215,8 @@ principal() {
 						# Senao sincroniza no mesmo servidor
 						else
 							# formata os caminhos de origem e destino, exemplo:
-							# antes.: siig:siig_homologacao
-							# depois: /var/www/siig/ /var/www/siig_homologacao/
+							# antes.: projeto:projeto_homologacao
+							# depois: /var/www/projeto/ /var/www/projeto_homologacao/
 
 							ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 

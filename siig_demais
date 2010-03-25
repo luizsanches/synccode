@@ -1,12 +1,10 @@
 /config/ d
 /controller/ d
 /model/ d
-/model/dao/ d
 /model/database/ d
 /model/generic/ d
 /model/template/ dr
 /model/utils/ dr
-/model/vo/ d
 /view/ d
 /view/css/ dr
 /view/images/ dr

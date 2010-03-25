@@ -1,57 +1,80 @@
-synccode
+synccode - Sincroniza codigo-fonte de repositorios SVN entre servidores
 
-Programa para sincronizar módulos do projeto siig.
-Do servidor SVN para o servidor de Teste.
-Do servidor de Teste para outros diretórios, como exemplo para o diretório de Homologação.
+E necessario a presenca de quatro utilitarios do Linux no servidor:
+  sed: para tratamento de string.
+  svn: para baixar o codigo-fonte do repositorio subversion.
+  rsync: para sincronizar os diretorios.
+  dialog: para utilizar caixas de dialogo de interacao com o usuario.
 
-Antes de instalar é necessário a presença de quatro utilitários do Linux no servidor:
-sed: para tratamento de string.
-svn: para baixar o código-fonte do repositório subversion.
-rsync: para sincronizar os diretórios.
-dialog: para utilizar caixas de diálogo de interação com o usuário.
+Instalacao no servidor
+----------------------
+1. Abrir um terminal no Linux ou putty no Windows.
 
-Instalação no servidor:
-1.Abrir um terminal no Linux ou putty no Windows.
-2.Copiar o programa para o diretório do usuário no servidor ssh: scp -P <porta> synccode <destino>
-Exemplo: scp -P 1529 synccode luizsanches@192.168.200.12:~/
-3.Digitar: ssh -p <porta_ssh> usuario@ip_servidor <enter> <depois a senha de acesso>
-Exemplo: ssh -p 1529 luizsanches@192.168.200.12
-4.Se não conectou como root, transformar-se no próprio: sudo su
-5.Criar o diretório /opt/synccode: mkdir /opt/synccode
-6.Mover o programa para o diretório criado: mv synccode /opt/synccode
-7.Mudar o proprietário do diretório: chown luizsanches.luizsanches /opt/synccode
-8.Mudar as permissões de acesso ao diretório: chmod 755 -R /opt/synccode
-9.Criar um link simbólico para o programa: ln -s /opt/synccode/synccode /usr/local/bin/synccode
-10.Volte a ser usuário comum: exit
-11.Execute o programa: synccode
-12.Tecle <enter> no projeto siig.
-13.Vão ser feitas 3 perguntas de configuração do programa, caso não haja mudanças tecle <enter> em cada opção.
-Servidor = 192.168.200.12
-Diretório do Repositório = /var/svn/desenvolvimento/
-Diretório de Destino = /var/www/
-OBS.: Não esqueça das barras no final do caminho dos diretórios.
-14.A seguir serão feitas 3 perguntas de configuração do usuário, caso não haja mudanças tecle <enter> em cada opção.
-Nome de login no SVN
-Senha do SVN
-Gerência em que trabalha (GPI ou GPA)
-15.A seguir poderá selecionar um módulo ou demais pastas do projeto.
-16.O processo realizado pelo programa segue abaixo:
-O código-fonte é baixado do repositório svn em um diretório temporário do usuário.
-Em seguida é sincronizado o diretório temporário com o diretório de destino do projeto.
-É gravado um log dos arquivos sincronizados no diretório do usuário.
-É feito um backup (bkp-<projeto>) dentro do diretório de destino com os arquivos que foram sincronizados.
+2. Copiar o programa para o diretorio do usuario no servidor ssh: scp -P <porta> synccode <destino>
+   Exemplo: scp -P 22 synccode usuario@192.168.0.1:~/
 
-Arquivos de Configuração
-Os seguintes arquivos são criados na instalação do programa no diretório /opt/synccode/
-1.projetos: lista com o nome dos projetos, com o formato abaixo:
-projeto:descrição do projeto
-2.siig_demais: lista de diretórios que são de uso geral do projeto, com o formato baixo:
-/diretorio/opcao (onde d=somente o diretório, r=recursivamente)
-3.siig_completo: lista de diretórios de sincronização de todo o projeto, com o formato abaixo:
-título:descrição:diretório de origem:diretório de destino:modo de comunicação
-4.siig_exclude: lista com diretório que não serão sincronizados, com o formato abaixo:
-/diretório/subnível/
-5.siig_modulos: lista dos módulos de cada gerência, com o formato abaixo:
-sigla da gerência:módulo:descrição do módulo
-6.synccode.conf: parâmetros que foram gravados na primeira execução do programa, com o formato abaixo:
-VARIAVEL="conteúdo"
+3. Digitar: ssh -p <porta_ssh> usuario@ip_servidor <enter> <depois a senha de acesso>
+   Exemplo: ssh -p 22 usuario@192.168.0.1
+
+4. Se nao conectou como root, transforme-se: sudo su (para distribuicoes debian based)
+
+5. Criar o diretorio /opt/synccode: mkdir /opt/synccode
+
+6. Mover o programa para o diretorio criado: mv synccode /opt/synccode
+
+7. Mudar o proprietario do diretorio: chown usuario.grupo /opt/synccode
+
+8. Mudar as permissoes de acesso ao diretorio: chmod 755 -R /opt/synccode
+
+9. Criar um link simbolico para o programa: ln -s /opt/synccode/synccode /usr/local/bin/synccode
+
+10. Volte a ser usuario comum: exit
+
+11. Execute o programa: synccode
+
+12. Tecle <enter> no projeto.
+
+13. Vao ser feitas 3 perguntas de configuracao do programa, caso nao haja mudancas tecle <enter> em cada opcao.
+    Servidor = 192.168.0.1
+    Diretorio do Repositorio = /var/svn/desenvolvimento/
+    Diretorio de Destino = /var/www/
+    Nome de login no SVN = usuario
+    Senha do SVN = senha
+    Porta do servico SSH = numero da porta
+
+    OBS.: Nao esqueca das barras no final do caminho dos diretorios.
+
+14. A seguir sera feita a pergunta do departamento/gerencia em que trabalha.
+
+15. A seguir podera selecionar um modulo ou demais pastas do projeto.
+
+16. Segue abaixo o processo realizado pelo programa:
+    O codigo-fonte e baixado do repositorio svn em um diretorio temporario, dentro do diretorio base de destino.
+    Em seguida e sincronizado o diretorio temporario com o diretorio de destino do projeto.
+    E gravado um log dos arquivos sincronizados no diretorio do usuario.
+    Tambem e feito um backup (bkp-<projeto>) dentro do diretorio de destino com os arquivos que foram sincronizados.
+
+Arquivos de Configuracao
+------------------------
+Os seguintes arquivos sao criados na instalacao do programa no diretorio /opt/synccode/
+
+1. projetos: lista com o nome dos projetos, com o formato abaixo:
+projeto:descricao do projeto
+
+2. gerencias: lista com o nome das gerencias/departamentos, com o formato abaixo:
+sigla:descricao da gerencia
+
+3. <projeto>_demais: lista de diretorios que sao de uso geral do projeto, com o formato baixo:
+/diretorio/ opcao (onde d=somente o diretorio, r=recursivamente)
+
+4. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
+título:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
+
+5. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
+/diretorio/subdiretorio/
+
+6. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
+sigla da gerencia:modulo:descricao do modulo:diretorio_filtro1|diretorio_filtro2|...
+
+7. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
+VARIAVEL="conteudo"

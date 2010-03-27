@@ -68,7 +68,7 @@ sigla:descricao da gerencia
 /diretorio/ opcao (onde d=somente o diretorio, r=recursivamente)
 
 4. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
-título:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
+titulo:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
 
 5. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
 /diretorio/subdiretorio/

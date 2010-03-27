@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 24/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.08
+# 26/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao 1.09
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -150,107 +150,81 @@ principal() {
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 			# Selecao de modulo
-			MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser atualizado para o servidor de teste na pasta [$PROJETO]:\" 0 0 0 $MODULOS_PROJETO)
+			MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser sincronizado\" 0 0 0 $MODULOS_PROJETO)
 
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
 
 			# se escolher a opcao 'Outros'
 			if [ "$MODULO" = "Outros" ]; then
-				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
+				# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
+				[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
-				if [ -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-					LISTA_OUTRAS_OPCOES="Demais \"Demais pastas comuns a todos os modulos do projeto [$PROJETO]\" ${LISTA_OUTRAS_OPCOES}"
-				fi
+				# Executa a funcao para baixar o projeto do SVN
+				baixaProjetoSvn
+
+				while read LINHA
+				do
+					sincronizaDiretorio $LINHA
+				done < $ARQUIVO_PROJETO_DEMAIS
+
+				exibeResultado
+			else # Para a escolha de um modulo
+				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
+
+				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
 
 				while : ; do
 					# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
 					[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
 					# Selecao de outras opcoes
-					OPCAO=$(eval $DIALOG --stdout --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
+					OPCAO=$(eval $DIALOG --stdout --title \"[ $TITULO_MODULO ]\" --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
 
 					# Se cancelar retorna a tela de modulos
 					[ $? -ne 0 ] && break
 
-					if [ "$OPCAO" = "Demais" ]; then
-						# Executa a funcao para baixar o projeto do SVN
-						baixaProjetoSvn
+					DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
 
-						while read LINHA
-						do
-							sincronizaDiretorio $LINHA
-						done < $ARQUIVO_PROJETO_DEMAIS
+					DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
 
-						exibeResultado
-					# Outros diretorios (completo)
+					DATA=$(date +%Y-%m-%d)
+					HORA=$(date +%H-%M)
+
+					PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
+
+					# Se o 5o parametro for "SSH" entao sincronizar via ssh
+					if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
+						# formata os caminhos do servidor e diretorio de destino via SSH
+						# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
+						# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
+
+						PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
+
+						PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
+
+						DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
+
+						ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
+
+						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
+					# Senao sincroniza no mesmo servidor
 					else
-						DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
+						# formata os caminhos de origem e destino, exemplo:
+						# antes.: projeto:projeto_homologacao
+						# depois: /var/www/projeto/ /var/www/projeto_homologacao/
 
-						DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 
-						DATA=$(date +%Y-%m-%d)
-						HORA=$(date +%H-%M)
+						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
 
-						PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
-
-						# Se o 5o parametro for "SSH" entao sincronizar via ssh
-						if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
-							# formata os caminhos do servidor e diretorio de destino via SSH
-							# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
-							# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
-
-							PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
-
-							PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
-
-							DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
-
-							ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
-
-							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
-
- 							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO" "SSH"
-
-						# Senao sincroniza no mesmo servidor
-						else
-							# formata os caminhos de origem e destino, exemplo:
-							# antes.: projeto:projeto_homologacao
-							# depois: /var/www/projeto/ /var/www/projeto_homologacao/
-
-							ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
-
-							DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
-
-							PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
-
-							sincroniza $PROJETO_COMPLETO r "SIMULA" "$OPCAO"
-						fi
-
-						exibeResultado
+						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
 					fi
+
+					sincroniza $PROJETO_COMPLETO r "SIMULA" "$TITULO_MODULO - $OPCAO" "$PROJETO_COMPLETO_COMUNICACAO" "$GERENCIA:$MODULO"
+
+					exibeResultado
 				done
-			else # Para a escolha de um modulo
-				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
-
-				DATA=$(date +%Y-%m-%d)
-				HORA=$(date +%H-%M)
-
-				DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA"
-
-				# Executa a funcao para baixar o projeto do SVN
-				baixaProjetoSvn
-
-				# Sincroniza o projeto criando um backup
-				# Se o diretorio do projeto nao existir, sincroniza tudo
-				if [ ! -e "$DIR_DESTINO$PROJETO" ]; then
-					sincroniza "$DIR_TMP_SYNC" "$DIR_DESTINO" a "naosimula" "$MODULO"
-				# Se existir, sincroniza somente os diretorios do modulo selecionado
-				else
-					sincroniza "$DIR_TMP_SYNC" "$DIR_DESTINO" r "SIMULA" "Modulo: $TITULO_MODULO" "LOCAL" "$GERENCIA:$MODULO"
-				fi
-
-				exibeResultado
 			fi
 		done
 	done
@@ -307,7 +281,7 @@ sincroniza() {
 		fi
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
-		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d; /^created/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
 
 		# Adiciona os arquivos na lista de arquivos para nao sincronizar
 		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE

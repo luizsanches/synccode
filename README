@@ -64,17 +64,14 @@ projeto:descricao do projeto
 2. gerencias: lista com o nome das gerencias/departamentos, com o formato abaixo:
 sigla:descricao da gerencia
 
-3. <projeto>_demais: lista de diretorios que sao de uso geral do projeto, com o formato baixo:
-/diretorio/ opcao (onde d=somente o diretorio, r=recursivamente)
-
-4. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
+3. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
 titulo:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
 
-5. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
+4. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
 /diretorio/subdiretorio/
 
-6. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
-sigla da gerencia:modulo:descricao do modulo:diretorio_filtro1|diretorio_filtro2|...
+5. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
+sigla da gerencia:modulo:descricao do modulo:filtro1|filtro2|...
 
-7. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
+6. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
 VARIAVEL="conteudo"

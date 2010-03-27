@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 26/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao 1.09
+# 27/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.10
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -10,9 +10,9 @@ principal() {
 
 	# Definicao de variaveis do programa
 	SCRIPT="synccode"
-	VERSAO_SCRIPT=$(sed '/Versao/!d; q' $0)
-	IP_COMPUTADOR=$(/sbin/ifconfig | grep 'inet end.:' | cut -d: -f2 | cut -d' ' -f2 | sed '/127.0.0.1/ d')
+	VERSAO_SCRIPT=$(sed '/Versao/ !d; q' $0)
 	NOME_COMPUTADOR=$(uname -n)
+	IP_COMPUTADOR=$(/sbin/ifconfig | grep 'inet end.:' | cut -d: -f2 | cut -d' ' -f2 | sed '/127.0.0.1/ d')
 
 	DIR_SCRIPT=$(pwd)
 
@@ -46,11 +46,11 @@ principal() {
 	verificaArquivo "/bin/sed"
 
 	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza codigo-fonte de repositorios SVN entre servidores. ${VERSAO_SCRIPT:2} - Usuario: $USER - Computador: $NOME_COMPUTADOR ($IP_COMPUTADOR)'"
+	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza codigo-fonte de repositorios entre servidores - ${VERSAO_SCRIPT:2} - Usuario: $USER - Computador: $NOME_COMPUTADOR $IP_COMPUTADOR'"
 
 	# Verifica a existencia do arquivo de projetos
 	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
-		echo "projeto:Descricao do projeto" > $ARQUIVO_PROJETOS
+		echo "projeto:descricao do projeto" > $ARQUIVO_PROJETOS
 	fi
 
 	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
@@ -67,7 +67,7 @@ principal() {
 		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
 		if [ ! -e "$ARQUIVO_MODULOS" ]; then
-			echo "gerencia:Modulo:Descricao do modulo" > $ARQUIVO_MODULOS
+			echo "gerencia:modulo:descricao do modulo" > $ARQUIVO_MODULOS
 		fi
 
 		# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
@@ -95,7 +95,7 @@ principal() {
 		else
 			# Verifica a existencia do arquivo de gerencias
 			if [ ! -e "$ARQUIVO_GERENCIAS" ]; then
-				echo "gerencia:Descricao da gerencia" > $ARQUIVO_GERENCIAS
+				echo "gerencia:descricao da gerencia" > $ARQUIVO_GERENCIAS
 			fi
 
 			# seleciona as gerencias, no arquivo gerencias, com o padrao gerencia:descricao
@@ -131,101 +131,86 @@ principal() {
 		
 		verificaArquivo "$ARQUIVO_MODULOS"
 
-		MODULOS_PROJETO=$(sed "/$GERENCIA/!d" $ARQUIVO_MODULOS | cut -d: -f2,3 | sed 's/:/ "/;s/$/"/')
-
-		ARQUIVO_PROJETO_DEMAIS="$DIR_CONF/${PROJETO}_demais"
+		MODULOS_PROJETO=$(sed "/$GERENCIA/ !d" $ARQUIVO_MODULOS | cut -d: -f2,3 | sed 's/:/ "/;s/$/"/')
 
 		ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
 
-		if [ ! -e "$ARQUIVO_PROJETO_DEMAIS" ]; then
-			echo "/diretorio/ dr" > $ARQUIVO_PROJETO_DEMAIS
-		fi
+		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
 
-		if [ -e "$ARQUIVO_PROJETO_DEMAIS" ] || [ -e "$ARQUIVO_PROJETO_COMPLETO" ]; then
-			MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
-		fi
+		# Executa a funcao para baixar o projeto do repositorio
+		baixaProjetoRepositorio
 
 		while : ; do
 			# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
-			# Selecao de modulo
+			# Selecao de modulo da gerencia
 			MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser sincronizado\" 0 0 0 $MODULOS_PROJETO)
 
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
 
-			# se escolher a opcao 'Outros'
 			if [ "$MODULO" = "Outros" ]; then
+				TITULO_MODULO="Outros diretorios"
+				FILTRO="Outros"
+			else
+				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
+				FILTRO="$GERENCIA:$MODULO"
+			fi
+
+			LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
+
+			while : ; do
 				# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
 				[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
-				# Executa a funcao para baixar o projeto do SVN
-				baixaProjetoSvn
+				# Selecao de outras opcoes
+				OPCAO=$(eval $DIALOG --stdout --title \"[ $TITULO_MODULO ]\" --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
 
-				while read LINHA
-				do
-					sincronizaDiretorio $LINHA
-				done < $ARQUIVO_PROJETO_DEMAIS
+				# Se cancelar retorna a tela de modulos
+				[ $? -ne 0 ] && break
+
+				DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
+
+				DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+
+				DATA=$(date +%Y-%m-%d)
+				HORA=$(date +%H-%M)
+
+				PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
+
+				# Se o 5o parametro for "SSH" entao sincronizar via ssh
+				if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
+					# formata os caminhos do servidor e diretorio de destino via SSH
+					# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
+					# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
+
+					PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
+
+					PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
+
+					DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
+
+					ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
+
+					PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
+				# Senao sincroniza no mesmo servidor
+				else
+					# formata os caminhos de origem e destino, exemplo:
+					# antes.: projeto:projeto_homologacao
+					# depois: /var/www/projeto/ /var/www/projeto_homologacao/
+
+					ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
+
+					DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
+
+					PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+				fi
+
+				sincroniza $PROJETO_COMPLETO r "SIMULA" "$TITULO_MODULO - $OPCAO" "$PROJETO_COMPLETO_COMUNICACAO" "$FILTRO"
 
 				exibeResultado
-			else # Para a escolha de um modulo
-				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
-
-				LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
-
-				while : ; do
-					# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
-					[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
-
-					# Selecao de outras opcoes
-					OPCAO=$(eval $DIALOG --stdout --title \"[ $TITULO_MODULO ]\" --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
-
-					# Se cancelar retorna a tela de modulos
-					[ $? -ne 0 ] && break
-
-					DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
-
-					DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
-
-					DATA=$(date +%Y-%m-%d)
-					HORA=$(date +%H-%M)
-
-					PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
-
-					# Se o 5o parametro for "SSH" entao sincronizar via ssh
-					if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
-						# formata os caminhos do servidor e diretorio de destino via SSH
-						# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
-						# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
-
-						PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
-
-						PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
-
-						DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
-
-						ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
-
-						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
-					# Senao sincroniza no mesmo servidor
-					else
-						# formata os caminhos de origem e destino, exemplo:
-						# antes.: projeto:projeto_homologacao
-						# depois: /var/www/projeto/ /var/www/projeto_homologacao/
-
-						ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
-
-						DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
-
-						PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
-					fi
-
-					sincroniza $PROJETO_COMPLETO r "SIMULA" "$TITULO_MODULO - $OPCAO" "$PROJETO_COMPLETO_COMUNICACAO" "$GERENCIA:$MODULO"
-
-					exibeResultado
-				done
-			fi
+			done
 		done
 	done
 
@@ -233,7 +218,7 @@ principal() {
 	exit
 }
 
-baixaProjetoSvn() {
+baixaProjetoRepositorio() {
 	# Se o diretorio existir executar SVN update
 	if [ -e "$DIR_TMP_SYNC" ]; then
 		svn update $DIR_TMP_SYNC
@@ -302,16 +287,34 @@ sincroniza() {
 			if [ -n "$7" ]; then
 				[ -e "${LISTA_TMP}0" ] && rm "${LISTA_TMP}0"
 
-				FILTROS_MODULO=$(sed "/$7/!d" $ARQUIVO_MODULOS | cut -d: -f4 | sed 's/|/\n/g')
+				if [ "$MODULO" = "Outros" ]; then
+					# Percorre todo o arquivo de modulos para retirar os diretorios dos modulos
+					cat "$ARQUIVO_MODULOS" | while read LINHA_MODULO
+					do
+						FILTROS_MODULO=$(echo $LINHA_MODULO | cut -d: -f4 | sed 's/|/\n/g')
 
-				# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
-				echo "$FILTROS_MODULO" | while read LINHA
-				do
-					TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
-					sed "/$TEMP/ !d" "${LISTA_TMP}" >> "${LISTA_TMP}0"
-				done
+						# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
+						echo "$FILTROS_MODULO" | while read LINHA
+						do
+							TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
 
-				mv "${LISTA_TMP}0" "$LISTA_TMP"
+							sed "/$TEMP/ d" "${LISTA_TMP}" > "${LISTA_TMP}0"
+							
+							mv "${LISTA_TMP}0" "$LISTA_TMP"
+						done
+					done
+				else
+					FILTROS_MODULO=$(sed "/$7/!d" $ARQUIVO_MODULOS | cut -d: -f4 | sed 's/|/\n/g')
+
+					# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
+					echo "$FILTROS_MODULO" | while read LINHA
+					do
+						TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
+						sed "/$TEMP/ !d" "${LISTA_TMP}" >> "${LISTA_TMP}0"
+					done
+
+					mv "${LISTA_TMP}0" "$LISTA_TMP"
+				fi
 			fi
 
 			# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
@@ -334,7 +337,7 @@ sincroniza() {
 							LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
 
 							# Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
-							sed "/$LINHA_TEMP/d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
+							sed "/$LINHA_TEMP/ d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
 
 							mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
 						done
@@ -372,31 +375,21 @@ sincroniza() {
 	fi
 }
 
-sincronizaDiretorio() {
-	#echo $1 = diretorio
-	#echo $2 = opcao do rsync
-	DATA=$(date +%Y-%m-%d)
-	HORA=$(date +%H-%M)
-	DIR_BACKUP="${DIR_DESTINO}bkp-$PROJETO/$DATA/$HORA$1"
-
-	[ -e "$DIR_TMP_SYNC$1" ] && sincroniza "$DIR_TMP_SYNC$1" "$DIR_DESTINO$PROJETO$1" $2 "SIMULA" "$1"
-}
-
 exibeResultado() {
 	CONTEUDO=$(cat "${ARQUIVO_LOG}.res")
 
 	if [ -z "$CONTEUDO" ]; then
-		eval $DIALOG --title \"log da atualizacao\" --msgbox \"Nenhum arquivo foi atualizado\" 0 0
+		eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --msgbox \"Nenhum arquivo foi sincronizado\" 0 0
 	else
 		# Atualiza o arquivo de log permanente
 		cat "${ARQUIVO_LOG}.res" >> $ARQUIVO_LOG_PERMANENTE
 
-		eval $DIALOG --title \"log da atualizacao\" --textbox "${ARQUIVO_LOG}.res" 0 0
+		eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --textbox "${ARQUIVO_LOG}.res" 0 0
 	fi
 }
 
 verificaArquivo() {
-	# Verifica a existencia do programa $1
+	# Verifica a existencia do arquivo passado como parametro $1
 	if [ ! -e "$1" ]; then
 		echo "ATENCAO! O arquivo '$1' nao foi encontrado. Operacao cancelada."
 		exit

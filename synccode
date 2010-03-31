@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 27/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.10
+# 30/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.11
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -137,10 +137,10 @@ principal() {
 
 		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
 
-		# Executa a funcao para baixar o projeto do repositorio
-		baixaProjetoRepositorio
-
 		while : ; do
+			# Executa a funcao para baixar o projeto do repositorio
+			baixaProjetoRepositorio
+
 			# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
@@ -349,21 +349,21 @@ sincroniza() {
 
 							ssh -p $PORTA_SSH $SERVIDOR_PRODUCAO "umask 002 ; mkdir -p $DIR_BACKUP"
 
-							rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+							rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 
 						else # No mesmo servidor
-							rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+							rsync -CvzpOu$3 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 						fi
 					fi
 				fi
 			else
 				# Sincroniza o projeto prevendo delecao de arquivos
-				rsync -CvzpOu$3 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+				rsync -CvzpOu$3 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 			fi
 		fi
 	else
 		# Sincroniza o projeto sem perguntar nada
-		rsync -CvzpOu$3 $4 --delete --no-perms -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+		rsync -CvzpOu$3 $4 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 	fi
 
 	if [ -e "$ARQUIVO_LOG" ]; then

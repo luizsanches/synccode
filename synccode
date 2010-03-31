@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 30/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.11
+# 31/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.12
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -138,9 +138,6 @@ principal() {
 		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
 
 		while : ; do
-			# Executa a funcao para baixar o projeto do repositorio
-			baixaProjetoRepositorio
-
 			# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
 			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
 
@@ -149,6 +146,9 @@ principal() {
 
 			# Se cancelou retorna a tela de projetos
 			[ $? -ne 0 ] && break
+
+			# Executa a funcao para baixar o projeto do repositorio
+			baixaProjetoRepositorio
 
 			if [ "$MODULO" = "Outros" ]; then
 				TITULO_MODULO="Outros diretorios"

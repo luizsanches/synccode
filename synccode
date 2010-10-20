@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 31/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.12
+# 20/10/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.13
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -224,7 +224,14 @@ baixaProjetoRepositorio() {
 		svn update $DIR_TMP_SYNC
 	else # Senao, executar SVN checkout
 		mkdir -p $DIR_TMP_SYNC
- 		svn checkout "svn://$SERVIDOR$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
+
+    if [ "$SERVIDOR" = "127.0.0.1" ]; then
+      PROTOCOLO="file://"
+    else
+      PROTOCOLO="svn://$SERVIDOR"
+    fi
+
+ 		svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
 	fi
 }
 

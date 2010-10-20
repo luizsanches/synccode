@@ -1,30 +1,41 @@
 #!/bin/bash
 # conecta_servidor
 # Programa para conectar com o servidor ssh (herdado do sync2test-0.10.sh)
-# 22/09/2009 - Luiz Sanches
-# Versao 0.1
+# 13/07/2010 - Luiz Sanches
+# Versao 0.2
 
 # Definicao de variaveis do programa
-SCRIPT="sync2test"
+SCRIPT="synccode"
 DIR_CONF="$HOME/.$SCRIPT"
 ARQUIVO_CONF="$DIR_CONF/$SCRIPT.conf"
 
 # Criacao do diretorio de configuracao do programa
 [ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
 
+if [ "$1" == "limpa" ]; then
+	[ -e "$ARQUIVO_CONF" ] && rm "$ARQUIVO_CONF" && exit
+fi
+
 # Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
 if [ -e "$ARQUIVO_CONF" ]; then
 	. $ARQUIVO_CONF
 else
-	USUARIO=$1
-	SERVIDOR=$2
-	PORTA_SSH=$3
+	echo ""
+	echo "INFORME OS PARAMETROS ABAIXO PARA GUARDAR SUA CONEXAO."
+	echo "* Para limpar, informe o parametro 'limpa' pelo console"
+	echo "-------------------------------------------------------"
+	echo ""
 
-	if [ -z "$1" ] || [ -z  "$2" ] || [ -z "$3" ]; then
-		echo "ATENCAO! O arquivo de configuracao da conexao nao foi encontrado"
-		echo "Informe os parametros: NOME_USUARIO IP_SERVIDOR PORTA_SSH"
-		exit
-	fi
+	echo "NOME DO USUARIO:"
+	read USUARIO
+
+	echo ""
+	echo "IP DO SERVIDOR:"
+	read SERVIDOR
+
+	echo ""
+	echo "NUMERO DA PORTA SSH:"
+	read PORTA_SSH
 
 	echo "USUARIO=\"$USUARIO\"" > $ARQUIVO_CONF
 	echo "SERVIDOR=\"$SERVIDOR\"" >> $ARQUIVO_CONF

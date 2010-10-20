@@ -1,3 +1,0 @@
-Teste:repositorio -> siig_teste:.synccode/siig:siig_teste:LOCAL
-Homologacao:siig_teste -> siig_homologacao:siig_teste:siig_homologacao:LOCAL
-PRODUCAO:siig_homologacao -> siig (PRODUCAO):siig_homologacao:192.168.200.12@/home/luizsanches/#siig_producao:SSH

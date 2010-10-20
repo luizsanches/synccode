@@ -1,2 +1,0 @@
-#!/bin/bash
-dialog --title "sync2test" --msgbox "O programa esta em manutencao. Aguarde um momento..." 0 0

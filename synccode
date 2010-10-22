@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 20/10/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.13
+# 22/10/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.14
 
 principal() {
 	# Altera a mascara padrao do sistema para rwxrwxr-x
@@ -70,7 +70,7 @@ principal() {
 			echo "gerencia:modulo:descricao do modulo" > $ARQUIVO_MODULOS
 		fi
 
-		# Verifica a existencia do arquivo de configuracao, para carregamento das variaveis
+    # Verifica a existencia do arquivo de configuracao do synccode, para carregamento das variaveis
 		if [ -e "$ARQUIVO_CONF" ]; then
 			. $ARQUIVO_CONF
 		else
@@ -80,6 +80,7 @@ principal() {
 			USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
 			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
 			PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
+			ARQUIVOS_MARCADOS=$(eval $DIALOG --stdout --inputbox \"Os arquivos devem vir marcados? \(ON/OFF\):\" 0 0 \"OFF\")
 
 			echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
 			echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
@@ -87,6 +88,7 @@ principal() {
 			echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
 			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
 			echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
+			echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
 		fi
 
 		# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
@@ -273,7 +275,7 @@ sincroniza() {
 		fi
 
 		# Apaga as demais linhas, deixando somente os nomes dos arquivos
-		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d; /^created/ d;' "$LISTA_TMP" > "${LISTA_TMP}1"
+		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d; /^created/ d; /\/$/ d; ' "$LISTA_TMP" > "${LISTA_TMP}1"
 
 		# Adiciona os arquivos na lista de arquivos para nao sincronizar
 		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE
@@ -287,7 +289,7 @@ sincroniza() {
 			eval $DIALOG --title \"Arquivos com espacos\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
 		else
 			# Adiciona os campos para preparar para a caixa de checkbox do dialog
-			sed "s/$/ '' OFF/g" "${LISTA_TMP}1" > "$LISTA_TMP"
+			sed "s/$/ '' $ARQUIVOS_MARCADOS/g" "${LISTA_TMP}1" > "$LISTA_TMP"
 			rm "${LISTA_TMP}1" 
 
 			# Filtra somente os arquivos do modulo selecionado
@@ -380,6 +382,15 @@ sincroniza() {
 		rm "${ARQUIVO_LOG}.old"
 		cat "$ARQUIVO_LOG" >> "${ARQUIVO_LOG}.res"
 	fi
+
+	# deleta o arquivo de arquivos com espaco
+	[ -e "$ARQUIVO_COM_ESPACO" ] && rm $ARQUIVO_COM_ESPACO
+
+	# deleta o arquivo de log
+	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+
+	# Cria a lista de arquivos que nao serao sincronizados
+	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
 }
 
 exibeResultado() {

@@ -1,231 +1,231 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 22/10/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.14
+# 30/10/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.15
 
 principal() {
-	# Altera a mascara padrao do sistema para rwxrwxr-x
-	umask 002
+  # Altera a mascara padrao do sistema para rwxrwxr-x
+  umask 002
 
-	# Definicao de variaveis do programa
-	SCRIPT="synccode"
-	VERSAO_SCRIPT=$(sed '/Versao/ !d; q' $0)
-	NOME_COMPUTADOR=$(uname -n)
-	IP_COMPUTADOR=$(/sbin/ifconfig | grep 'inet end.:' | cut -d: -f2 | cut -d' ' -f2 | sed '/127.0.0.1/ d')
+  # Definicao de variaveis do programa
+  SCRIPT="synccode"
+  VERSAO_SCRIPT=$(sed '/Versao/ !d; q' $0)
+  NOME_COMPUTADOR=$(uname -n)
+  IP_COMPUTADOR=$(/sbin/ifconfig | grep 'inet end.:' | cut -d: -f2 | cut -d' ' -f2 | sed '/127.0.0.1/ d')
 
-	DIR_SCRIPT=$(pwd)
+  DIR_SCRIPT=$(pwd)
 
-	DIR_CONF="/opt/$SCRIPT"
-	DIR_CONF_USER="$HOME/.$SCRIPT"
+  DIR_CONF="/opt/$SCRIPT"
+  DIR_CONF_USER="$HOME/.$SCRIPT"
 
-	ARQUIVO_CONF="$DIR_CONF/$SCRIPT.conf"
-	ARQUIVO_CONF_USER="$DIR_CONF_USER/$SCRIPT.conf"
+  ARQUIVO_CONF="$DIR_CONF/$SCRIPT.conf"
+  ARQUIVO_CONF_USER="$DIR_CONF_USER/$SCRIPT.conf"
 
-	ARQUIVO_PROJETOS="$DIR_CONF/projetos"
-	ARQUIVO_GERENCIAS="$DIR_CONF/gerencias"
+  ARQUIVO_PROJETOS="$DIR_CONF/projetos"
+  ARQUIVO_GERENCIAS="$DIR_CONF/gerencias"
 
-	# Criacao dos diretorios de configuracao do programa
-	[ ! -e "$DIR_CONF" ] && mkdir "$DIR_CONF"
-	[ ! -e "$DIR_CONF_USER" ] && mkdir "$DIR_CONF_USER"
+  # Criacao dos diretorios de configuracao do programa
+  criaDiretorio "$DIR_CONF"
+  criaDiretorio "$DIR_CONF_USER"
 
-	# Definicao do program de dialogo como o usuario
-	if [ "$DISPLAY" ]; then
-		DIALOG="Xdialog"
+  # Definicao do program de dialogo como o usuario
+  if [ "$DISPLAY" ]; then
+    DIALOG="Xdialog"
 
-		# Verifica a existencia do programa Xdialog
-		[ ! -e "/usr/bin/$DIALOG" ] && DIALOG="dialog"
-	else
-		DIALOG="dialog"
-	fi
+    # Verifica a existencia do programa Xdialog
+    [ ! -e "/usr/bin/$DIALOG" ] && DIALOG="dialog"
+  else
+    DIALOG="dialog"
+  fi
 
-	# Verifica a existencia dos programas
-	verificaArquivo "/usr/bin/$DIALOG"
-	verificaArquivo "/usr/bin/svn"
-	verificaArquivo "/usr/bin/rsync"
-	verificaArquivo "/bin/sed"
+  # Verifica a existencia dos programas
+  verificaArquivo "/usr/bin/$DIALOG"
+  verificaArquivo "/usr/bin/svn"
+  verificaArquivo "/usr/bin/rsync"
+  verificaArquivo "/bin/sed"
 
-	# Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
-	DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza codigo-fonte de repositorios entre servidores - ${VERSAO_SCRIPT:2} - Usuario: $USER - Computador: $NOME_COMPUTADOR $IP_COMPUTADOR'"
+  # Cria a variavel $DIALOG_TITLE com parametro do titulo na tela de fundo
+  DIALOG="$DIALOG --backtitle '$SCRIPT - Sincroniza codigo-fonte de repositorios entre servidores - ${VERSAO_SCRIPT:2} - Usuario: $USER - Computador: $NOME_COMPUTADOR $IP_COMPUTADOR'"
 
-	# Verifica a existencia do arquivo de projetos
-	if [ ! -e "$ARQUIVO_PROJETOS" ]; then
-		echo "projeto:descricao do projeto" > $ARQUIVO_PROJETOS
-	fi
+  # Verifica a existencia do arquivo de projetos
+  if [ ! -e "$ARQUIVO_PROJETOS" ]; then
+    echo "projeto:descricao do projeto" > $ARQUIVO_PROJETOS
+  fi
 
-	# seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
-	LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed "s/:/ '/;s/$/'/")
+  # seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
+  LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed "s/:/ '/;s/$/'/")
 
-	while : ; do	
-		# Selecao de projeto
-		PROJETO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
+  while : ; do	
+    # Selecao de projeto
+    PROJETO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o projeto:\" 0 0 0 $LISTA_PROJETOS)
 
-		# Se cancelar, sai do programa
-		[ $? -ne 0 ] && break
+    # Se cancelar, sai do programa
+    [ $? -ne 0 ] && break
 
-		# Verifica a existencia do arquivo de modulos das gerencias
-		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
+    # Verifica a existencia do arquivo de modulos das gerencias
+    ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
-		if [ ! -e "$ARQUIVO_MODULOS" ]; then
-			echo "gerencia:modulo:descricao do modulo" > $ARQUIVO_MODULOS
-		fi
+    if [ ! -e "$ARQUIVO_MODULOS" ]; then
+      echo "gerencia:modulo:descricao do modulo" > $ARQUIVO_MODULOS
+    fi
 
     # Verifica a existencia do arquivo de configuracao do synccode, para carregamento das variaveis
-		if [ -e "$ARQUIVO_CONF" ]; then
-			. $ARQUIVO_CONF
-		else
-			SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"ip\")
-			DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/\")
-			DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
-			USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
-			SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
-			PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
-			ARQUIVOS_MARCADOS=$(eval $DIALOG --stdout --inputbox \"Os arquivos devem vir marcados? \(ON/OFF\):\" 0 0 \"OFF\")
+    if [ -e "$ARQUIVO_CONF" ]; then
+      . $ARQUIVO_CONF
+    else
+      SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"ip\")
+      DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/\")
+      DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
+      USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
+      SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
+      PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
+      ARQUIVOS_MARCADOS=$(eval $DIALOG --stdout --inputbox \"Os arquivos devem vir marcados? \(ON/OFF\):\" 0 0 \"OFF\")
 
-			echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
-			echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
-			echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
-			echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
-			echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
-			echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
-			echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
-		fi
+      echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
+      echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
+      echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
+      echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
+      echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
+      echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
+      echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
+    fi
 
-		# Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
-		if [ -e "$ARQUIVO_CONF_USER" ]; then
-			. $ARQUIVO_CONF_USER
-		else
-			# Verifica a existencia do arquivo de gerencias
-			if [ ! -e "$ARQUIVO_GERENCIAS" ]; then
-				echo "gerencia:descricao da gerencia" > $ARQUIVO_GERENCIAS
-			fi
+    # Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
+    if [ -e "$ARQUIVO_CONF_USER" ]; then
+      . $ARQUIVO_CONF_USER
+    else
+      # Verifica a existencia do arquivo de gerencias
+      if [ ! -e "$ARQUIVO_GERENCIAS" ]; then
+        echo "gerencia:descricao da gerencia" > $ARQUIVO_GERENCIAS
+      fi
 
-			# seleciona as gerencias, no arquivo gerencias, com o padrao gerencia:descricao
-			LISTA_GERENCIAS=$(sed '-n' 'p' $ARQUIVO_GERENCIAS | sed "s/:/ '/;s/$/'/")
+      # seleciona as gerencias, no arquivo gerencias, com o padrao gerencia:descricao
+      LISTA_GERENCIAS=$(sed '-n' 'p' $ARQUIVO_GERENCIAS | sed "s/:/ '/;s/$/'/")
 
-			# Selecao de gerencia
-			GERENCIA=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 $LISTA_GERENCIAS)
+      # Selecao de gerencia
+      GERENCIA=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione a gerencia em que trabalha:\" 0 0 0 $LISTA_GERENCIAS)
 
-			# Converte o conteudo da variavel gerencia para minusculo
-			GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
+      # Converte o conteudo da variavel gerencia para minusculo
+      GERENCIA=$(echo $GERENCIA | tr [:upper:] [:lower:])
 
-			# se a gerencia for nula, emitir mensagem e retornar a tela de projetos
-			if [ -z "$GERENCIA" ]; then
-				eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada.\" 0 0
-				continue
-			fi
+      # se a gerencia for nula, emitir mensagem e retornar a tela de projetos
+      if [ -z "$GERENCIA" ]; then
+        eval $DIALOG --title \"$SCRIPT\" --msgbox \"Nenhuma gerencia foi selecionada.\" 0 0
+        continue
+      fi
 
-			echo "GERENCIA=\"$GERENCIA\"" > $ARQUIVO_CONF_USER
-		fi
+      echo "GERENCIA=\"$GERENCIA\"" > $ARQUIVO_CONF_USER
+    fi
 
-		# Arquivos de log
-		ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log"
-		DIR_LOG_PERMANENTE="$DIR_DESTINO/.$SCRIPT/log"
-		ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO}_${USER}.log"
+    # Arquivos de log
+    ARQUIVO_LOG="$DIR_CONF_USER/.$SCRIPT-temp.log"
+    DIR_LOG_PERMANENTE="$DIR_DESTINO/.$SCRIPT/log"
+    ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${PROJETO}_${USER}.log"
 
-		[ ! -e "$DIR_LOG_PERMANENTE" ] && mkdir -p $DIR_LOG_PERMANENTE
+    criaDiretorio "$DIR_LOG_PERMANENTE"
 
-		# Prepara o diretorio de sincronizacao
-		DIR_TMP_SYNC="${DIR_DESTINO}.$SCRIPT/$PROJETO"
+    # Prepara o diretorio de sincronizacao
+    DIR_TMP_SYNC="${DIR_DESTINO}.$SCRIPT/$PROJETO"
 
-		# Seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao gerencia:modulo:descricao
-		ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
-		
-		verificaArquivo "$ARQUIVO_MODULOS"
+    # Seleciona os modulos do projeto, no arquivo $PROJETO_modulos, com o padrao gerencia:modulo:descricao
+    ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
 
-		MODULOS_PROJETO=$(sed "/$GERENCIA/ !d" $ARQUIVO_MODULOS | cut -d: -f2,3 | sed 's/:/ "/;s/$/"/')
+    verificaArquivo "$ARQUIVO_MODULOS"
 
-		ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
+    MODULOS_PROJETO=$(sed "/$GERENCIA/ !d" $ARQUIVO_MODULOS | cut -d: -f2,3 | sed 's/:/ "/;s/$/"/')
 
-		MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
+    ARQUIVO_PROJETO_COMPLETO="$DIR_CONF/${PROJETO}_completo"
 
-		while : ; do
-			# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
-			[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
+    MODULOS_PROJETO="${MODULOS_PROJETO} Outros \"Outros diretorios\""
 
-			# Selecao de modulo da gerencia
-			MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser sincronizado\" 0 0 0 $MODULOS_PROJETO)
+    while : ; do
+      # deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
+      deletaArquivo "${ARQUIVO_LOG}.res"
 
-			# Se cancelou retorna a tela de projetos
-			[ $? -ne 0 ] && break
+      # Selecao de modulo da gerencia
+      MODULO=$(eval $DIALOG --stdout --title \"[ $SCRIPT ]\" --menu \"Selecione o modulo do projeto [$PROJETO] a ser sincronizado\" 0 0 0 $MODULOS_PROJETO)
 
-			# Executa a funcao para baixar o projeto do repositorio
-			baixaProjetoRepositorio
+      # Se cancelou retorna a tela de projetos
+      [ $? -ne 0 ] && break
 
-			if [ "$MODULO" = "Outros" ]; then
-				TITULO_MODULO="Outros diretorios"
-				FILTRO="Outros"
-			else
-				TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
-				FILTRO="$GERENCIA:$MODULO"
-			fi
+      # Executa a funcao para baixar o projeto do repositorio
+      baixaProjetoRepositorio
 
-			LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
+      if [ "$MODULO" = "Outros" ]; then
+        TITULO_MODULO="Outros diretorios"
+        FILTRO="Outros"
+      else
+        TITULO_MODULO=$(sed "/$GERENCIA:$MODULO/!d" $ARQUIVO_MODULOS | cut -d: -f3)
+        FILTRO="$GERENCIA:$MODULO"
+      fi
 
-			while : ; do
-				# deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
-				[ -e "${ARQUIVO_LOG}.res" ] && rm "${ARQUIVO_LOG}.res"
+      LISTA_OUTRAS_OPCOES=$(sed '-n' 'p' $ARQUIVO_PROJETO_COMPLETO | cut -d: -f1,2 | sed 's/:/ "/;s/$/"/')
 
-				# Selecao de outras opcoes
-				OPCAO=$(eval $DIALOG --stdout --title \"[ $TITULO_MODULO ]\" --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
+      while : ; do
+        # deleta o arquivo de resultado para mostrar somente a ultima sincronizacao
+        deletaArquivo "${ARQUIVO_LOG}.res"
 
-				# Se cancelar retorna a tela de modulos
-				[ $? -ne 0 ] && break
+        # Selecao de outras opcoes
+        OPCAO=$(eval $DIALOG --stdout --title \"[ $TITULO_MODULO ]\" --menu \"Selecione uma opcao:\" 0 0 0 $LISTA_OUTRAS_OPCOES)
 
-				DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
+        # Se cancelar retorna a tela de modulos
+        [ $? -ne 0 ] && break
 
-				DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
+        DIR_DESTINO_ESCAPE=$(echo $DIR_DESTINO | sed "s,\/,\\\/,g")
 
-				DATA=$(date +%Y-%m-%d)
-				HORA=$(date +%H-%M)
+        DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4)
 
-				PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
+        DATA=$(date +%Y-%m-%d)
+        HORA=$(date +%H-%M)
 
-				# Se o 5o parametro for "SSH" entao sincronizar via ssh
-				if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
-					# formata os caminhos do servidor e diretorio de destino via SSH
-					# antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
-					# depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
+        PROJETO_COMPLETO_COMUNICACAO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f5)
 
-					PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
+        # Se o 5o parametro for "SSH" entao sincronizar via ssh
+        if [ "$PROJETO_COMPLETO_COMUNICACAO" = "SSH" ]; then
+          # formata os caminhos do servidor e diretorio de destino via SSH
+          # antes: projeto_homologacao:192.168.200.12@/var/www/#projeto
+          # depois: /var/www/projeto_homologacao/ 192.168.200.12:/var/www/projeto/
 
-					PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
+          PROJETO_COMPLETO_DIR_DESTINO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f1)
 
-					DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
+          PROJETO_COMPLETO_DIR_ALVO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f4 | cut -d@ -f2 | cut -d# -f2)
 
-					ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
+          DIR_BACKUP="${PROJETO_COMPLETO_DIR_DESTINO}bkp-${PROJETO_COMPLETO_DIR_ALVO}/$DATA/$HORA"
 
-					PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
-				# Senao sincroniza no mesmo servidor
-				else
-					# formata os caminhos de origem e destino, exemplo:
-					# antes.: projeto:projeto_homologacao
-					# depois: /var/www/projeto/ /var/www/projeto_homologacao/
+          ARQUIVO_LOG_PERMANENTE="${DIR_DESTINO}.$SCRIPT/log/${PROJETO_COMPLETO_DIR_ALVO}_${USER}.log"
 
-					ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
+          PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ /; s/$/\//; s/@/:/; s/#//")
+          # Senao sincroniza no mesmo servidor
+        else
+          # formata os caminhos de origem e destino, exemplo:
+          # antes.: projeto:projeto_homologacao
+          # depois: /var/www/projeto/ /var/www/projeto_homologacao/
 
-					DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
+          ARQUIVO_LOG_PERMANENTE="$DIR_LOG_PERMANENTE/${DIR_ALVO}_${USER}.log"
 
-					PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
-				fi
+          DIR_BACKUP="${DIR_DESTINO}bkp-${DIR_ALVO}/$DATA/$HORA"
 
-				sincroniza $PROJETO_COMPLETO r "SIMULA" "$TITULO_MODULO - $OPCAO" "$PROJETO_COMPLETO_COMUNICACAO" "$FILTRO"
+          PROJETO_COMPLETO=$(sed "/$OPCAO/!d" $ARQUIVO_PROJETO_COMPLETO | cut -d: -f3,4 | sed "s/^/$DIR_DESTINO_ESCAPE/; s/:/\/ $DIR_DESTINO_ESCAPE/; s/$/\//")
+        fi
 
-				exibeResultado
-			done
-		done
-	done
+        sincroniza $PROJETO_COMPLETO r "SIMULA" "$TITULO_MODULO - $OPCAO" "$PROJETO_COMPLETO_COMUNICACAO" "$FILTRO"
 
-	clear
-	exit
+        exibeResultado
+      done
+    done
+  done
+
+  clear
+  exit
 }
 
 baixaProjetoRepositorio() {
-	# Se o diretorio existir executar SVN update
-	if [ -e "$DIR_TMP_SYNC" ]; then
-		svn update $DIR_TMP_SYNC
-	else # Senao, executar SVN checkout
-		mkdir -p $DIR_TMP_SYNC
+  # Se o diretorio existir executar SVN update
+  if [ -e "$DIR_TMP_SYNC" ]; then
+    svn update $DIR_TMP_SYNC
+  else # Senao, executar SVN checkout
+    criaDiretorio "$DIR_TMP_SYNC"
 
     if [ "$SERVIDOR" = "127.0.0.1" ]; then
       PROTOCOLO="file://"
@@ -233,185 +233,191 @@ baixaProjetoRepositorio() {
       PROTOCOLO="svn://$SERVIDOR"
     fi
 
- 		svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
-	fi
+    svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
+  fi
 }
 
 sincroniza() {
-	#echo $1 = origem
-	#echo $2 = destino
-	#echo $3 = r (recursive), a (archive), d (directory)
-	#echo $4 = qualquer parametro do rsync
-	#echo $5 = titulo da janela (nome do modulo/servidor)
-	#echo $6 = modo de comunicacao SSH ou vazio
-	#echo $7 = modulo:gerencia
+  #echo $1 = origem
+  #echo $2 = destino
+  #echo $3 = r (recursive), a (archive), d (directory)
+  #echo $4 = qualquer parametro do rsync
+  #echo $5 = titulo da janela (nome do modulo/servidor)
+  #echo $6 = modo de comunicacao SSH ou vazio
+  #echo $7 = modulo:gerencia
 
-	# Seleciona arquivos que nao serao sincronizados
-	ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
-	LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
-	LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
-	ARQUIVO_COM_ESPACO="$DIR_CONF_USER/.tem_espaco"
+  # Seleciona arquivos que nao serao sincronizados
+  ARQUIVO_PROJETO_EXCLUDE="$DIR_CONF/${PROJETO}_exclude"
+  LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
+  LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
+  ARQUIVO_COM_ESPACO="$DIR_CONF_USER/.tem_espaco"
+  ERRO_SSH="$DIR_CONF_USER/.erro_ssh"
 
-	# deleta o arquivo de arquivos com espaco
-	[ -e "$ARQUIVO_COM_ESPACO" ] && rm $ARQUIVO_COM_ESPACO
+  # deleta os arquivos temporarios
+  deletaArquivo "$ARQUIVO_COM_ESPACO"
+  deletaArquivo "$ARQUIVO_LOG"
+  deletaArquivo "$ERRO_SSH"
+  deletaArquivo "$LISTA_EXCLUDE"
 
-	# deleta o arquivo de log
-	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
+  [ -e "$ARQUIVO_PROJETO_EXCLUDE" ] && cat $ARQUIVO_PROJETO_EXCLUDE > $LISTA_EXCLUDE
 
-	# Cria a lista de arquivos que nao serao sincronizados
-	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
+  # Se o arquivo nao foi criado, criar um vazio
+  [ ! -e "$LISTA_EXCLUDE" ] && touch $LISTA_EXCLUDE
 
-	[ -e "$ARQUIVO_PROJETO_EXCLUDE" ] && cat $ARQUIVO_PROJETO_EXCLUDE > $LISTA_EXCLUDE
+  if [ "$4" = "SIMULA" ]; then
+    # Simula (-n) a sincronizacao guardando em arquivo
+    if [ "$6" = "SSH" ]; then
+      echo "Conectando com o servidor para simulacao, aguarde..."
+      rsync -CvzpOu$3 -n -e "ssh -l $USER -p $PORTA_SSH" --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP 2> $ERRO_SSH
 
-	# Se o arquivo nao foi criado, criar um vazio
-	[ ! -e "$LISTA_EXCLUDE" ] && touch $LISTA_EXCLUDE
+      if [ -e "$ERRO_SSH" ]; then
+        TEM_ERRO_SSH=$(cat "$ERRO_SSH")
+        if [ -n "$TEM_ERRO_SSH" ]; then
+          eval $DIALOG --title \"[ $SCRIPT ]\" --msgbox \"Nao foi possivel conectar com o servidor $2\" 0 0
+        fi
+      fi
+    else
+      rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
+    fi
 
-	if [ "$4" = "SIMULA" ]; then
-		# Simula (-n) a sincronizacao guardando em arquivo
-		if [ "$6" = "SSH" ]; then
-			rsync -CvzpOu$3 -n -e "ssh -l $USER -p $PORTA_SSH" --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
-		else
-			rsync -CvzpOu$3 -n --delete --exclude-from=$LISTA_EXCLUDE $1 $2 > $LISTA_TMP
-		fi
+    # Apaga as demais linhas, deixando somente os nomes dos arquivos
+    sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d; /^created/ d; /\/$/ d; ' "$LISTA_TMP" > "${LISTA_TMP}1"
 
-		# Apaga as demais linhas, deixando somente os nomes dos arquivos
-		sed '/^$/ d; /^sen/ d; /^total/ d; /^deleting/ d; /^building/ d; /^skipping/ d; /^created/ d; /\/$/ d; ' "$LISTA_TMP" > "${LISTA_TMP}1"
+    # Adiciona os arquivos na lista de arquivos para nao sincronizar
+    cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE
 
-		# Adiciona os arquivos na lista de arquivos para nao sincronizar
-		cat "${LISTA_TMP}1" >> $LISTA_EXCLUDE
+    # Verifica na lista se existe algum arquivo com espaco em branco no nome
+    sed '/ / !d' $LISTA_EXCLUDE > $ARQUIVO_COM_ESPACO
 
-		# Verifica na lista se existe algum arquivo com espaco em branco no nome
-		sed '/ / !d' $LISTA_EXCLUDE > $ARQUIVO_COM_ESPACO
+    TEM_ESPACO=$(sed '/ / !d' "$LISTA_EXCLUDE")
 
-		TEM_ESPACO=$(sed '/ / !d' "$LISTA_EXCLUDE")
+    if [ -n "$TEM_ESPACO" ]; then
+      eval $DIALOG --title \"Arquivos com espacos\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
+    else
+      # Adiciona os campos para preparar para a caixa de checkbox do dialog
+      sed "s/$/ '' $ARQUIVOS_MARCADOS/g" "${LISTA_TMP}1" > "$LISTA_TMP"
+      rm "${LISTA_TMP}1" 
 
-		if [ -n "$TEM_ESPACO" ]; then
-			eval $DIALOG --title \"Arquivos com espacos\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
-		else
-			# Adiciona os campos para preparar para a caixa de checkbox do dialog
-			sed "s/$/ '' $ARQUIVOS_MARCADOS/g" "${LISTA_TMP}1" > "$LISTA_TMP"
-			rm "${LISTA_TMP}1" 
+      # Filtra somente os arquivos do modulo selecionado
+      if [ -n "$7" ]; then
+        deletaArquivo "${LISTA_TMP}0"
 
-			# Filtra somente os arquivos do modulo selecionado
-			if [ -n "$7" ]; then
-				[ -e "${LISTA_TMP}0" ] && rm "${LISTA_TMP}0"
+        if [ "$MODULO" = "Outros" ]; then
+          # Percorre todo o arquivo de modulos para retirar os diretorios dos modulos
+          cat "$ARQUIVO_MODULOS" | while read LINHA_MODULO
+        do
+          FILTROS_MODULO=$(echo $LINHA_MODULO | cut -d: -f4 | sed 's/|/\n/g')
 
-				if [ "$MODULO" = "Outros" ]; then
-					# Percorre todo o arquivo de modulos para retirar os diretorios dos modulos
-					cat "$ARQUIVO_MODULOS" | while read LINHA_MODULO
-					do
-						FILTROS_MODULO=$(echo $LINHA_MODULO | cut -d: -f4 | sed 's/|/\n/g')
+          # Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
+          echo "$FILTROS_MODULO" | while read LINHA
+        do
+          TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
 
-						# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
-						echo "$FILTROS_MODULO" | while read LINHA
-						do
-							TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
+          sed "/$TEMP/ d" "${LISTA_TMP}" > "${LISTA_TMP}0"
 
-							sed "/$TEMP/ d" "${LISTA_TMP}" > "${LISTA_TMP}0"
-							
-							mv "${LISTA_TMP}0" "$LISTA_TMP"
-						done
-					done
-				else
-					FILTROS_MODULO=$(sed "/$7/!d" $ARQUIVO_MODULOS | cut -d: -f4 | sed 's/|/\n/g')
+          mv "${LISTA_TMP}0" "$LISTA_TMP"
+        done
+      done
+    else
+      FILTROS_MODULO=$(sed "/$7/!d" $ARQUIVO_MODULOS | cut -d: -f4 | sed 's/|/\n/g')
 
-					# Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
-					echo "$FILTROS_MODULO" | while read LINHA
-					do
-						TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
-						sed "/$TEMP/ !d" "${LISTA_TMP}" >> "${LISTA_TMP}0"
-					done
+      # Percorre os itens do filtro para colocar escape nas barras de divisao de diretorios
+      echo "$FILTROS_MODULO" | while read LINHA
+    do
+      TEMP=$(echo $LINHA | sed 's,\/,\\\/,g')
+      sed "/$TEMP/ !d" "${LISTA_TMP}" >> "${LISTA_TMP}0"
+    done
 
-					mv "${LISTA_TMP}0" "$LISTA_TMP"
-				fi
-			fi
+    mv "${LISTA_TMP}0" "$LISTA_TMP"
+  fi
+fi
 
-			# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
-			ARQ_EXCLUDES=$(cat $LISTA_TMP)
+# Mostra os arquivos e opcao para selecionar os que nao serao sincronizados
+ARQ_EXCLUDES=$(cat $LISTA_TMP)
 
-			[ -e "$LISTA_TMP" ] && rm $LISTA_TMP
+deletaArquivo "$LISTA_TMP"
 
-			# Se nao for nula, exibira a caixa com os arquivos para selecao
-			if [ -n "$ARQ_EXCLUDES" ]; then
-				LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"[ $5 ]\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
+# Se nao for nula, exibira a caixa com os arquivos para selecao
+if [ -n "$ARQ_EXCLUDES" ]; then
+  LISTA_SINCRONIZAR=$(eval $DIALOG --stdout --separate-output --title \"[ $5 ]\" --checklist \"Marque os arquivos, com a barra de espaco, que serao sincronizados\" 0 0 0 $ARQ_EXCLUDES)
 
-				# Se nao cancelou
-				if [ $? -eq 0 ]; then
-					# Se selecionou arquivos
-					if [ -n "$LISTA_SINCRONIZAR" ]; then
-						# Adiciona na lista os arquivos que nao serao sincronizados
-						echo "$LISTA_SINCRONIZAR" | while read LINHA
-						do
-							# Adiciona escape nas barras separadoras dos diretorios
-							LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
+  # Se nao cancelou
+  if [ $? -eq 0 ]; then
+    # Se selecionou arquivos
+    if [ -n "$LISTA_SINCRONIZAR" ]; then
+      # Adiciona na lista os arquivos que nao serao sincronizados
+      echo "$LISTA_SINCRONIZAR" | while read LINHA
+    do
+      # Adiciona escape nas barras separadoras dos diretorios
+      LINHA_TEMP=$(echo $LINHA | sed "s,\/,\\\/,g")
 
-							# Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
-							sed "/$LINHA_TEMP/ d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
+      # Deleta o arquivo selecionado da lista dos arquivos que nao serao sincronizados
+      sed "/$LINHA_TEMP/ d" $LISTA_EXCLUDE > "${LISTA_EXCLUDE}.tmp"
 
-							mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
-						done
+      mv "${LISTA_EXCLUDE}.tmp" $LISTA_EXCLUDE
+    done
 
-						# Sincroniza o projeto sem os arquivos selecionados anteriormente
+    # Sincroniza o projeto sem os arquivos selecionados anteriormente
 
-						if [ "$6" = "SSH" ]; then # Via SSH
-							SERVIDOR_PRODUCAO=$(echo $2 | cut -d: -f1)
+    if [ "$6" = "SSH" ]; then # Via SSH
+      SERVIDOR_PRODUCAO=$(echo $2 | cut -d: -f1)
 
-							ssh -p $PORTA_SSH $SERVIDOR_PRODUCAO "umask 002 ; mkdir -p $DIR_BACKUP"
+      echo "Conectando com o servidor para sincronizacao, aguarde..."
+      rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
 
-							rsync -Cvzpu$3 -e "ssh -l $USER -p $PORTA_SSH" --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+    else # No mesmo servidor
+      rsync -CvzpOu$3 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+    fi
+  fi
+fi
+      else # Nenhum arquivo a ser sincronizado
+        eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --msgbox \"Nenhum arquivo para sincronizar\" 0 0
+      fi
+    fi
+  else # Sincroniza o projeto sem perguntar nada
+    rsync -CvzpOu$3 $4 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
+  fi
 
-						else # No mesmo servidor
-							rsync -CvzpOu$3 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
-						fi
-					fi
-				fi
-			else
-				# Sincroniza o projeto prevendo delecao de arquivos
-				rsync -CvzpOu$3 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
-			fi
-		fi
-	else
-		# Sincroniza o projeto sem perguntar nada
-		rsync -CvzpOu$3 $4 --delete -h -b --backup-dir=$DIR_BACKUP --log-file=$ARQUIVO_LOG --exclude-from=$LISTA_EXCLUDE $1 $2
-	fi
+  if [ -e "$ARQUIVO_LOG" ]; then
+    # Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
+    mv "$ARQUIVO_LOG" "${ARQUIVO_LOG}.old"
+    sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "${ARQUIVO_LOG}.old" > "$ARQUIVO_LOG"
+    rm "${ARQUIVO_LOG}.old"
+    cat "$ARQUIVO_LOG" >> "${ARQUIVO_LOG}.res"
+  fi
 
-	if [ -e "$ARQUIVO_LOG" ]; then
-		# Apaga as linhas abaixo do log para mostrar somente o nome dos arquivos sincronizados
-		mv "$ARQUIVO_LOG" "${ARQUIVO_LOG}.old"
-		sed "/building/ d; /done/ d; /receiving/ d; /sent/,+1 d" "${ARQUIVO_LOG}.old" > "$ARQUIVO_LOG"
-		rm "${ARQUIVO_LOG}.old"
-		cat "$ARQUIVO_LOG" >> "${ARQUIVO_LOG}.res"
-	fi
-
-	# deleta o arquivo de arquivos com espaco
-	[ -e "$ARQUIVO_COM_ESPACO" ] && rm $ARQUIVO_COM_ESPACO
-
-	# deleta o arquivo de log
-	[ -e "$ARQUIVO_LOG" ] && rm $ARQUIVO_LOG
-
-	# Cria a lista de arquivos que nao serao sincronizados
-	[ -e "$LISTA_EXCLUDE" ] && rm $LISTA_EXCLUDE
+  # deletacao dos arquivos temporarios
+  deletaArquivo "$ARQUIVO_COM_ESPACO"
+  deletaArquivo "$ARQUIVO_LOG"
+  deletaArquivo "$LISTA_EXCLUDE"
+  deletaArquivo "$ERRO_SSH"
 }
 
 exibeResultado() {
-	CONTEUDO=$(cat "${ARQUIVO_LOG}.res")
+  CONTEUDO=$(cat "${ARQUIVO_LOG}.res" 2> /dev/null)
 
-	if [ -z "$CONTEUDO" ]; then
-		eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --msgbox \"Nenhum arquivo foi sincronizado\" 0 0
-	else
-		# Atualiza o arquivo de log permanente
-		cat "${ARQUIVO_LOG}.res" >> $ARQUIVO_LOG_PERMANENTE
+  if [ -n "$CONTEUDO" ]; then
+    # Atualiza o arquivo de log permanente
+    cat "${ARQUIVO_LOG}.res" >> $ARQUIVO_LOG_PERMANENTE
 
-		eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --textbox "${ARQUIVO_LOG}.res" 0 0
-	fi
+    eval $DIALOG --title \"[ $SCRIPT - Resultado ]\" --textbox "${ARQUIVO_LOG}.res" 0 0
+  fi
 }
 
 verificaArquivo() {
-	# Verifica a existencia do arquivo passado como parametro $1
-	if [ ! -e "$1" ]; then
-		echo "ATENCAO! O arquivo '$1' nao foi encontrado. Operacao cancelada."
-		exit
-	fi
+  # Verifica a existencia do arquivo passado como parametro $1
+  if [ ! -e "$1" ]; then
+    echo "ATENCAO! O arquivo '$1' nao foi encontrado. Operacao cancelada."
+    exit
+  fi
+}
+
+deletaArquivo() {
+  [ -e "$1" ] && rm $1
+}
+
+criaDiretorio() {
+  [ ! -e "$1" ] && mkdir -p "$1"
 }
 
 principal

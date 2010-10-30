@@ -91,6 +91,8 @@ principal() {
       echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
     fi
 
+    [ -z "$ARQUIVOS_MARCADOS" ] && ARQUIVOS_MARCADOS="ON"
+
     # Verifica a existencia do arquivo de configuracao do usuario, para carregamento das variaveis
     if [ -e "$ARQUIVO_CONF_USER" ]; then
       . $ARQUIVO_CONF_USER

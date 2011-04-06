@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 27/03/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.5
+# 05/04/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.6
 
 principal() {
   # Altera a mascara padrao do sistema para rwxrwxr-x
@@ -75,19 +75,21 @@ principal() {
     if [ -e "$ARQUIVO_CONF" ]; then
       . $ARQUIVO_CONF
     else
-      SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor SVN:\" 0 0 \"ip\")
-      DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio SVN \(com / no final\):\" 0 0 \"/var/svn/\")
+      SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor :\" 0 0 \"ip\")
+      DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio \(com / no final\):\" 0 0 \"/var/svn/\")
       DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
-      USUARIO_SVN=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao SVN:\" 0 0 \"$USER\")
-      SENHA_SVN=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario SVN:\" 0 0 \"senha\")
+      TIPO_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o tipo do Repositorio \(svn/git\):\" 0 0 \"svn\")
+      USUARIO_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao Repositorio:\" 0 0 \"$USER\")
+      SENHA_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario do Repositorio:\" 0 0 \"senha\")
       PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
       ARQUIVOS_MARCADOS=$(eval $DIALOG --stdout --inputbox \"Os arquivos devem vir marcados? \(ON/OFF\):\" 0 0 \"OFF\")
 
       echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
       echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
       echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
-      echo "USUARIO_SVN=\"$USUARIO_SVN\"" >> $ARQUIVO_CONF
-      echo "SENHA_SVN=\"$SENHA_SVN\"" >> $ARQUIVO_CONF
+      echo "TIPO_REPOSITORIO=\"$TIPO_REPOSITORIO\"" >> $ARQUIVO_CONF
+      echo "USUARIO_REPOSITORIO=\"$USUARIO_REPOSITORIO\"" >> $ARQUIVO_CONF
+      echo "SENHA_REPOSITORIO=\"$SENHA_REPOSITORIO\"" >> $ARQUIVO_CONF
       echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
       echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
     fi
@@ -241,19 +243,32 @@ principal() {
 }
 
 baixaProjetoRepositorio() {
-  # Se o diretorio existir executar SVN update
-  if [ -e "$DIR_TMP_SYNC" ]; then
-    svn update $DIR_TMP_SYNC
-  else # Senao, executar SVN checkout
-    criaDiretorio "$DIR_TMP_SYNC"
+  TIPO=$(echo $TIPO_REPOSITORIO | tr [:upper:] [:lower:])
 
-    if [ "$SERVIDOR" = "127.0.0.1" ]; then
-      PROTOCOLO="file://"
+  if [ "$TIPO" = "svn" ]; then
+    if [ -e "$DIR_TMP_SYNC" ]; then
+      svn update $DIR_TMP_SYNC
     else
-      PROTOCOLO="svn://$SERVIDOR"
-    fi
+      criaDiretorio "$DIR_TMP_SYNC"
 
-    svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_SVN --password $SENHA_SVN $DIR_TMP_SYNC
+      if [ "$SERVIDOR" = "127.0.0.1" ]; then
+        PROTOCOLO="file://"
+      else
+        PROTOCOLO="$TIPO://$SERVIDOR"
+      fi
+
+      svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_REPOSITORIO --password $SENHA_REPOSITORIO $DIR_TMP_SYNC
+    fi
+  elif [ "$TIPO" = "git" ]; then
+    if [ -e "$DIR_TMP_SYNC" ]; then
+      cd $DIR_TMP_SYNC
+      git pull
+    else
+      cd "${DIR_DESTINO}.$SCRIPT"
+      git clone "$TIPO://$SERVIDOR$DIR_REPOSITORIO"
+    fi
+  else
+    eval $DIALOG --title \"[ $SCRIPT ]\" --msgbox \"Tipo de repositorio invalido. Verifique as configuracoes\" 0 0
   fi
 }
 

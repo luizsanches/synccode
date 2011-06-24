@@ -1,4 +1,4 @@
-synccode - Sincroniza codigo-fonte de repositorios SVN entre servidores
+synccode - Sincroniza codigo-fonte entre servidores
 
 USUARIOS E GRUPOS:
 ------------------
@@ -7,7 +7,6 @@ e deve ser dada permissao de escrita em todos os arquivos dos projetos para o gr
 
 E necessario a presenca de quatro utilitarios do Linux no servidor:
   sed: para tratamento de string.
-  svn: para baixar o codigo-fonte do repositorio subversion.
   rsync: para sincronizar os diretorios.
   dialog: para utilizar caixas de dialogo de interacao com o usuario.
 
@@ -39,13 +38,10 @@ Instalacao no servidor
 
 12. Tecle <enter> no projeto.
 
-13. Vao ser feitas 3 perguntas de configuracao do programa, caso nao haja mudancas tecle <enter> em cada opcao.
-    Servidor = 192.168.0.1
-    Diretorio do Repositorio = /var/svn/desenvolvimento/
+13. Serao feitas algumas perguntas de configuracao do programa, caso nao haja mudancas tecle <enter> em cada opcao.
     Diretorio de Destino = /var/www/
-    Nome de login no SVN = usuario
-    Senha do SVN = senha
     Porta do servico SSH = numero da porta
+    Arquivos devem vir marcados = (ON ou OFF)
 
     OBS.: Nao esqueca das barras no final do caminho dos diretorios.
 
@@ -54,7 +50,7 @@ Instalacao no servidor
 15. A seguir podera selecionar um modulo ou demais pastas do projeto.
 
 16. Segue abaixo o processo realizado pelo programa:
-    O codigo-fonte e baixado do repositorio svn em um diretorio temporario, dentro do diretorio base de destino.
+    O codigo-fonte e baixado do repositorio de codigo em um diretorio temporario, dentro do diretorio base de destino.
     Em seguida e sincronizado o diretorio temporario com o diretorio de destino do projeto.
     E gravado um log dos arquivos sincronizados no diretorio do usuario.
     Tambem e feito um backup (bkp-<projeto>) dentro do diretorio de destino com os arquivos que foram sincronizados.
@@ -64,7 +60,7 @@ Arquivos de Configuracao
 Os seguintes arquivos sao criados na instalacao do programa no diretorio /opt/synccode/
 
 1. projetos: lista com o nome dos projetos, com o formato abaixo:
-projeto:descricao do projeto
+projeto:descricao do projeto:tipo de repositorio:endereco do servidor:caminho do repositorio
 
 2. gerencias: lista com o nome das gerencias/departamentos, com o formato abaixo:
 sigla:descricao da gerencia

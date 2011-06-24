@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 05/04/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.6
+# 24/06/2010 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.7
 
 principal() {
   # Altera a mascara padrao do sistema para rwxrwxr-x
@@ -41,7 +41,6 @@ principal() {
 
   # Verifica a existencia dos programas
   verificaArquivo "/usr/bin/$DIALOG"
-  verificaArquivo "/usr/bin/svn"
   verificaArquivo "/usr/bin/rsync"
   verificaArquivo "/bin/sed"
   verificaArquivo "/usr/bin/tree"
@@ -51,11 +50,11 @@ principal() {
 
   # Verifica a existencia do arquivo de projetos
   if [ ! -e "$ARQUIVO_PROJETOS" ]; then
-    echo "projeto:descricao do projeto" > $ARQUIVO_PROJETOS
+    echo "projeto:descricao do projeto:tipo de repositorio:endereco do servidor:caminho do repositorio" > $ARQUIVO_PROJETOS
   fi
 
   # seleciona os projetos, no arquivo projetos, com o padrao projeto:descricao
-  LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | sed "s/:/ '/;s/$/'/")
+  LISTA_PROJETOS=$(sed '-n' 'p' $ARQUIVO_PROJETOS | cut -d: -f1,2 | sed "s/:/ '/;s/$/'/")
 
   while : ; do
     # Selecao de projeto
@@ -63,6 +62,11 @@ principal() {
 
     # Se cancelar, sai do programa
     [ $? -ne 0 ] && break
+
+    # Obtem o tipo e diretorio do repositorio do projeto
+    TIPO_REPOSITORIO=$(sed "/$PROJETO/ !d" $ARQUIVO_PROJETOS | cut -d: -f3)
+    SERVIDOR_REPOSITORIO=$(sed "/$PROJETO/ !d" $ARQUIVO_PROJETOS | cut -d: -f4)
+    DIR_REPOSITORIO=$(sed "/$PROJETO/ !d" $ARQUIVO_PROJETOS | cut -d: -f5)
 
     # Verifica a existencia do arquivo de modulos das gerencias
     ARQUIVO_MODULOS="$DIR_CONF/${PROJETO}_modulos"
@@ -75,21 +79,11 @@ principal() {
     if [ -e "$ARQUIVO_CONF" ]; then
       . $ARQUIVO_CONF
     else
-      SERVIDOR=$(eval $DIALOG --stdout --inputbox \"Digite o endereco do servidor :\" 0 0 \"ip\")
-      DIR_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o caminho do repositorio \(com / no final\):\" 0 0 \"/var/svn/\")
       DIR_DESTINO=$(eval $DIALOG --stdout --inputbox \"Digite o diretorio de destino \(com / no final\):\" 0 0 \"/var/www/\")
-      TIPO_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o tipo do Repositorio \(svn/git\):\" 0 0 \"svn\")
-      USUARIO_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite o nome do usuario de acesso ao Repositorio:\" 0 0 \"$USER\")
-      SENHA_REPOSITORIO=$(eval $DIALOG --stdout --inputbox \"Digite a senha do usuario do Repositorio:\" 0 0 \"senha\")
       PORTA_SSH=$(eval $DIALOG --stdout --inputbox \"Digite a porta do SSH:\" 0 0 \"porta\")
       ARQUIVOS_MARCADOS=$(eval $DIALOG --stdout --inputbox \"Os arquivos devem vir marcados? \(ON/OFF\):\" 0 0 \"OFF\")
 
-      echo "SERVIDOR=\"$SERVIDOR\"" > $ARQUIVO_CONF
-      echo "DIR_REPOSITORIO=\"$DIR_REPOSITORIO\"" >> $ARQUIVO_CONF
       echo "DIR_DESTINO=\"$DIR_DESTINO\"" >> $ARQUIVO_CONF
-      echo "TIPO_REPOSITORIO=\"$TIPO_REPOSITORIO\"" >> $ARQUIVO_CONF
-      echo "USUARIO_REPOSITORIO=\"$USUARIO_REPOSITORIO\"" >> $ARQUIVO_CONF
-      echo "SENHA_REPOSITORIO=\"$SENHA_REPOSITORIO\"" >> $ARQUIVO_CONF
       echo "PORTA_SSH=\"$PORTA_SSH\"" >> $ARQUIVO_CONF
       echo "ARQUIVOS_MARCADOS=\"$ARQUIVOS_MARCADOS\"" >> $ARQUIVO_CONF
     fi
@@ -251,13 +245,13 @@ baixaProjetoRepositorio() {
     else
       criaDiretorio "$DIR_TMP_SYNC"
 
-      if [ "$SERVIDOR" = "127.0.0.1" ]; then
+      if [ "$SERVIDOR_REPOSITORIO" = "127.0.0.1" ]; then
         PROTOCOLO="file://"
       else
-        PROTOCOLO="$TIPO://$SERVIDOR"
+        PROTOCOLO="$TIPO://$SERVIDOR_REPOSITORIO"
       fi
 
-      svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" --username $USUARIO_REPOSITORIO --password $SENHA_REPOSITORIO $DIR_TMP_SYNC
+      svn checkout "$PROTOCOLO$DIR_REPOSITORIO$PROJETO" $DIR_TMP_SYNC
     fi
   elif [ "$TIPO" = "git" ]; then
     if [ -e "$DIR_TMP_SYNC" ]; then
@@ -265,7 +259,7 @@ baixaProjetoRepositorio() {
       git pull
     else
       cd "${DIR_DESTINO}.$SCRIPT"
-      git clone "$TIPO://$SERVIDOR$DIR_REPOSITORIO"
+      git clone "$TIPO://$SERVIDOR_REPOSITORIO$DIR_REPOSITORIO$PROJETO.$TIPO"
     fi
   else
     eval $DIALOG --title \"[ $SCRIPT ]\" --msgbox \"Tipo de repositorio invalido. Verifique as configuracoes\" 0 0

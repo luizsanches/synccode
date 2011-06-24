@@ -1,8 +1,8 @@
 #!/bin/bash
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
-# 24/06/2010 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.7
+# 24/06/2011 - Luiz Sanches - luizgrsanches@gmail.com
+# Versao: 1.7.0
 
 principal() {
   # Altera a mascara padrao do sistema para rwxrwxr-x

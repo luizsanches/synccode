@@ -1,0 +1,3 @@
+pi:inscricao:Area de Inscricoes:inscricao/view
+pi:admin:Area Administrativa:inscricao/admin
+pi:banco:BD Negocios:inscricao/dao|inscricao/bo|inscricao/vo

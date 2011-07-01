@@ -11,13 +11,13 @@ SERVIDOR="192.168.200.236"
 
 # Criar autorizacao para nao pedir senha ao conectar via ssh
 if [ ! -e "$HOME/.ssh/authorized_keys" ]; then
-	ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "mkdir ~/.ssh ; touch ~/.ssh/authorized_keys"
+  ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "mkdir ~/.ssh ; touch ~/.ssh/authorized_keys"
 
-	ssh-keygen -t dsa -f ~/.ssh/id_dsa
+  ssh-keygen -t dsa -f ~/.ssh/id_dsa
 
-	cat ~/.ssh/id_dsa.pub | ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "cat - >> ~/.ssh/authorized_keys"
+  cat ~/.ssh/id_dsa.pub | ssh -p $PORTA_SSH "$USUARIO@$SERVIDOR" "cat - >> ~/.ssh/authorized_keys"
 
-	cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
+  cat ~/.ssh/id_dsa.pub >> ~/.ssh/authorized_keys
 fi
 
 ARQUIVO_TMP="/tmp/ssh_hostname.tmp"

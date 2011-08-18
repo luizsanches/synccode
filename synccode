@@ -331,7 +331,7 @@ sincroniza() {
       if [ -n "$7" ]; then
         deletaArquivo "${LISTA_TMP}0"
 
-        if [ "$MODULO" = "Outros" ]; then
+        if [ "$MODULO" = "[Outros]" ]; then
           # Percorre todo o arquivo de modulos para retirar os diretorios dos modulos
           cat "$ARQUIVO_MODULOS" | while read LINHA_MODULO; do
             FILTROS_MODULO=$(echo $LINHA_MODULO | cut -d: -f4 | sed 's/|/\n/g')

@@ -2,7 +2,7 @@
 # synccode
 # Programa de sincronizacao de codigo-fonte entre servidores
 # 24/06/2011 - Luiz Sanches - luizgrsanches@gmail.com
-# Versao: 1.7.0
+# Versao: 1.7.1
 
 principal() {
   # Altera a mascara padrao do sistema para rwxrwxr-x
@@ -280,10 +280,14 @@ sincroniza() {
   LISTA_EXCLUDE="$DIR_CONF_USER/.lista_exclude"
   LISTA_TMP="$DIR_CONF_USER/.lista_tmp"
   ARQUIVO_COM_ESPACO="$DIR_CONF_USER/.tem_espaco"
+  ARQUIVO_COM_ARROBA="$DIR_CONF_USER/.tem_arroba"
+  ARQUIVO_COM_PARENTESE="$DIR_CONF_USER/.tem_parentese"
   ERRO_SSH="$DIR_CONF_USER/.erro_ssh"
 
   # deleta os arquivos temporarios
   deletaArquivo "$ARQUIVO_COM_ESPACO"
+  deletaArquivo "$ARQUIVO_COM_ARROBA"
+  deletaArquivo "$ARQUIVO_COM_PARENTESE"
   deletaArquivo "$ARQUIVO_LOG"
   deletaArquivo "$ERRO_SSH"
   deletaArquivo "$LISTA_EXCLUDE"
@@ -317,11 +321,22 @@ sincroniza() {
 
     # Verifica na lista se existe algum arquivo com espaco em branco no nome
     sed '/ / !d' $LISTA_EXCLUDE > $ARQUIVO_COM_ESPACO
-
     TEM_ESPACO=$(sed '/ / !d' "$LISTA_EXCLUDE")
 
+    # Verifica na lista se existe algum arquivo com arroba no nome
+    sed '/@/ !d' $LISTA_EXCLUDE > $ARQUIVO_COM_ARROBA
+    TEM_ARROBA=$(sed '/@/ !d' "$LISTA_EXCLUDE")
+
+    # Verifica na lista se existe algum arquivo com parentese no nome
+    sed '/(/ !d' $LISTA_EXCLUDE > $ARQUIVO_COM_PARENTESE
+    TEM_PARENTESE=$(sed '/(/ !d' "$LISTA_EXCLUDE")
+
     if [ -n "$TEM_ESPACO" ]; then
-      eval $DIALOG --title \"Arquivos com espacos\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
+      eval $DIALOG --title \"Arquivos com espacos no nome. Voce deve renomea-los\" --textbox \"$ARQUIVO_COM_ESPACO\" 0 0
+    elif [ -n "$TEM_ARROBA" ]; then
+      eval $DIALOG --title \"Arquivos com arroba no nome. Voce deve renomea-los\" --textbox \"$ARQUIVO_COM_ARROBA\" 0 0
+    elif [ -n "$TEM_PARENTESE" ]; then
+      eval $DIALOG --title \"Arquivos com parentese no nome. Voce deve renomea-los\" --textbox \"$ARQUIVO_COM_PARENTESE\" 0 0
     else
       # Adiciona os campos para preparar para a caixa de checkbox do dialog
       sed "s/$/ '' $ARQUIVOS_MARCADOS/g" "${LISTA_TMP}1" > "$LISTA_TMP"

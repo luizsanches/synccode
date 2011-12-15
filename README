@@ -5,7 +5,7 @@ USUARIOS E GRUPOS:
 Os usuarios devem estar cadastrados no mesmo grupo de trabalho 
 e deve ser dada permissao de escrita em todos os arquivos dos projetos para o grupo
 
-E necessario a presenca de quatro utilitarios do Linux no servidor:
+E necessario a presenca de tres utilitarios do Linux no servidor:
   sed: para tratamento de string.
   rsync: para sincronizar os diretorios.
   dialog: para utilizar caixas de dialogo de interacao com o usuario.

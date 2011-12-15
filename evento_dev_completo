@@ -1,3 +1,3 @@
-Teste:repositorio -> evento_teste:.synccode/evento:evento_teste:LOCAL
+Teste:repositorio -> evento_teste:.synccode/evento_dev:evento_teste:LOCAL
 Homologacao:evento_teste -> evento_homologacao:evento_teste:evento_homologacao:LOCAL
 PRODUCAO:evento_homologacao -> evento (PRODUCAO):evento_homologacao:192.168.56.101@/var/www/#evento:SSH

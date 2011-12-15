@@ -57,25 +57,29 @@ Instalacao no servidor
 
 Arquivos de Configuracao
 ------------------------
-Os seguintes arquivos sao criados na instalacao do programa no diretorio /opt/synccode/
 
-1. projetos: lista com o nome dos projetos, com o formato abaixo:
+> Os arquivos abaixo sao criados na instalacao do programa no diretorio /opt/synccode/
+
+1. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
+VARIAVEL="conteudo"
+
+2. projetos: lista com o nome dos projetos, com o formato abaixo:
 projeto:descricao do projeto:tipo de repositorio:endereco do servidor:caminho do repositorio
 
-2. gerencias: lista com o nome das gerencias/departamentos, com o formato abaixo:
+3. gerencias: lista com o nome das gerencias/departamentos, com o formato abaixo:
 sigla:descricao da gerencia
 
-3. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
+
+> Os arquivos abaixo devem ser criados manualmente de acordo com cada projeto. ATENCAO: o nome do projeto deve ser o mesmo nome do diretorio principal do projeto.
+
+1. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
 titulo:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
 
 OBS.: quando for necessario fazer a sincronizacao via ssh, o registro deve seguir o seguinte exemplo:
   PRODUCAO:projeto_homologacao -> projeto (PRODUCAO):projeto_homologacao:192.168.200.236@/var/www/#projeto:SSH
 
-4. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
+2. <projeto>_exclude: lista com diretorios que nao serao sincronizados, com o formato abaixo:
 /diretorio/subdiretorio/
 
-5. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
+3. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
 sigla da gerencia:modulo:descricao do modulo:filtro1|filtro2|...
-
-6. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
-VARIAVEL="conteudo"

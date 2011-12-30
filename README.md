@@ -1,7 +1,6 @@
-synccode - Sincroniza codigo-fonte entre servidores
+# synccode - Sincroniza codigo-fonte entre servidores
 
-USUARIOS E GRUPOS:
-------------------
+## USUARIOS E GRUPOS:
 Os usuarios devem estar cadastrados no mesmo grupo de trabalho 
 e deve ser dada permissao de escrita em todos os arquivos dos projetos para o grupo
 
@@ -10,8 +9,7 @@ E necessario a presenca de tres utilitarios do Linux no servidor:
   rsync: para sincronizar os diretorios.
   dialog: para utilizar caixas de dialogo de interacao com o usuario.
 
-Instalacao no servidor
-----------------------
+## Instalacao no servidor
 1. Abrir um terminal no Linux ou putty no Windows.
 
 2. Copiar o programa para o diretorio do usuario no servidor ssh: scp -P <porta> synccode <destino>
@@ -55,10 +53,9 @@ Instalacao no servidor
     E gravado um log dos arquivos sincronizados no diretorio do usuario.
     Tambem e feito um backup (bkp-<projeto>) dentro do diretorio de destino com os arquivos que foram sincronizados.
 
-Arquivos de Configuracao
-------------------------
+## Arquivos de Configuracao
 
-> Os arquivos abaixo sao criados na instalacao do programa no diretorio /opt/synccode/
+**> Os arquivos abaixo sao criados na instalacao do programa no diretorio /opt/synccode/**
 
 1. synccode.conf: parametros que foram gravados na primeira execucao do programa, com o formato abaixo:
 VARIAVEL="conteudo"
@@ -70,7 +67,7 @@ projeto:descricao do projeto:tipo de repositorio:endereco do servidor:caminho do
 sigla:descricao da gerencia
 
 
-> Os arquivos abaixo devem ser criados manualmente de acordo com cada projeto. ATENCAO: o nome do projeto deve ser o mesmo nome do diretorio principal do projeto.
+**> Os arquivos abaixo devem ser criados manualmente de acordo com cada projeto. ATENCAO: o nome do projeto deve ser o mesmo nome do diretorio principal do projeto.**
 
 1. <projeto>_completo: lista de diretorios de sincronizacao de todo o projeto, com o formato abaixo:
 titulo:descricao:diretorio de origem:diretorio de destino:modo de comunicacao
@@ -83,3 +80,10 @@ OBS.: quando for necessario fazer a sincronizacao via ssh, o registro deve segui
 
 3. <projeto>_modulos: lista dos modulos de cada gerencia, com o formato abaixo:
 sigla da gerencia:modulo:descricao do modulo:filtro1|filtro2|...
+
+## AUTOR:
+Luiz Sanches (<http://luizsanches.wordpress.com>)
+
+## Licença:
+![CC-GNU-GPL](http://creativecommons.org/images/public/cc-GPL.png)
+Este Software é licenciado sob a CC-GNU GPL

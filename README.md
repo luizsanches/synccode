@@ -1,8 +1,7 @@
 # synccode - shell-script para sincronizar codigo-fonte entre servidores
 
 ## Usuarios e grupos
-Os usuarios devem estar cadastrados no mesmo grupo de trabalho 
-e deve ser dada permissao de escrita em todos os arquivos dos projetos para o grupo
+Os usuarios devem estar cadastrados no mesmo grupo de trabalho e deve ser dada permissao de escrita em todos os arquivos dos projetos para o grupo
 
 E necessario a presenca de tres utilitarios do Linux no servidor:
 
@@ -92,9 +91,9 @@ _/diretorio/subdiretorio/_
 _sigla da gerencia:modulo:descricao do modulo:filtro1|filtro2|..._
 
 ## Autor
-_Luiz Sanches_ (<http://luizsanches.wordpress.com>)
+Luiz Sanches (<http://luizsanches.wordpress.com>)
 
 ## Licenca
 ![CC-GNU-GPL](http://creativecommons.org/images/public/cc-GPL.png)
 
-Este Software e licenciado sob a CC-GNU GPL
+Este Software e licenciado sob a [CC-GNU GPL](<http://creativecommons.org/licenses/GPL/2.0/>)

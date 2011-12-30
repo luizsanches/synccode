@@ -6,9 +6,9 @@ e deve ser dada permissao de escrita em todos os arquivos dos projetos para o gr
 
 E necessario a presenca de tres utilitarios do Linux no servidor:
 
-* sed: para tratamento de string.
-* rsync: para sincronizar os diretorios.
-* dialog: para utilizar caixas de dialogo de interacao com o usuario.
+* **sed**: para tratamento de string.
+* **rsync**: para sincronizar os diretorios.
+* **dialog**: para utilizar caixas de dialogo de interacao com o usuario.
 
 ## Instalacao no servidor
 1. Abrir um terminal no Linux ou putty no Windows.
@@ -51,10 +51,10 @@ E necessario a presenca de tres utilitarios do Linux no servidor:
 15. A seguir podera selecionar um modulo ou demais pastas do projeto.
 
 16. Segue abaixo o processo realizado pelo programa:
-    * O codigo-fonte e baixado do repositorio de codigo em um diretorio temporario, dentro do diretorio base de destino.
+    * O codigo-fonte e baixado do repositorio de codigo em um diretorio oculto (**.synccode**), dentro do diretorio base de destino.
     * Em seguida e sincronizado o diretorio temporario com o diretorio de destino do projeto.
     * E gravado um log dos arquivos sincronizados no diretorio do usuario.
-    * Tambem e feito um backup (bkp-<projeto>) dentro do diretorio de destino com os arquivos que foram sincronizados.
+    * Tambem e feito um backup (`bkp-<projeto>`) dentro do diretorio de destino com os arquivos que foram sincronizados.
 
 ## Arquivos de configuracao
 

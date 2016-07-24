@@ -90,9 +90,6 @@ _/diretorio/subdiretorio/_
 
 _sigla da gerencia:modulo:descricao do modulo:filtro1|filtro2|..._
 
-## Autor
-Luiz Sanches (<http://luizsanches.wordpress.com>)
-
 ## Licenca
 ![CC-GNU-GPL](http://creativecommons.org/images/public/cc-GPL.png)
 
